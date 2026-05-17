@@ -1,0 +1,75 @@
+{
+  "top_15_features": [
+    {
+      "feature": "offers_completed",
+      "mean_abs_shap": 1.0769404172897339
+    },
+    {
+      "feature": "trans_count",
+      "mean_abs_shap": 0.6412566900253296
+    },
+    {
+      "feature": "reward",
+      "mean_abs_shap": 0.38352417945861816
+    },
+    {
+      "feature": "bogo_completed",
+      "mean_abs_shap": 0.3485460579395294
+    },
+    {
+      "feature": "offer_type_bogo",
+      "mean_abs_shap": 0.2854297161102295
+    },
+    {
+      "feature": "difficulty",
+      "mean_abs_shap": 0.2673133909702301
+    },
+    {
+      "feature": "offer_type_discount",
+      "mean_abs_shap": 0.1844317764043808
+    },
+    {
+      "feature": "income",
+      "mean_abs_shap": 0.1517832726240158
+    },
+    {
+      "feature": "discount_completed",
+      "mean_abs_shap": 0.15034182369709015
+    },
+    {
+      "feature": "trans_max",
+      "mean_abs_shap": 0.1330222636461258
+    },
+    {
+      "feature": "age",
+      "mean_abs_shap": 0.1280381828546524
+    },
+    {
+      "feature": "trans_std",
+      "mean_abs_shap": 0.12469489127397537
+    },
+    {
+      "feature": "trans_total",
+      "mean_abs_shap": 0.11823847144842148
+    },
+    {
+      "feature": "difficulty_per_day",
+      "mean_abs_shap": 0.11604639142751694
+    },
+    {
+      "feature": "difficulty_x_reward",
+      "mean_abs_shap": 0.11259440332651138
+    }
+  ],
+  "shap_statistics": {
+    "mean_abs_shap_global": 0.10513626784086227,
+    "std_shap_global": 0.21832798421382904,
+    "max_abs_shap": 1.8105177879333496,
+    "min_abs_shap": 0.0
+  },
+  "interpretation": {
+    "top_feature": "offers_completed",
+    "top_feature_shap": 1.0769404172897339,
+    "explanation": "Higher SHAP values indicate stronger push toward offer completion prediction"
+  }
+}

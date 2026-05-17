@@ -1,0 +1,139 @@
+{
+  "portfolio_validation": {
+    "shape": [
+      10,
+      6
+    ],
+    "columns": [
+      "reward",
+      "channels",
+      "difficulty",
+      "duration",
+      "offer_type",
+      "id"
+    ],
+    "dtypes": {
+      "reward": "int64",
+      "channels": "object",
+      "difficulty": "int64",
+      "duration": "float64",
+      "offer_type": "str",
+      "id": "str"
+    },
+    "missing_values": {
+      "reward": 0,
+      "channels": 0,
+      "difficulty": 0,
+      "duration": 0,
+      "offer_type": 0,
+      "id": 0
+    },
+    "offer_types": [
+      "bogo",
+      "informational",
+      "discount"
+    ],
+    "valid_schema": true,
+    "issues": []
+  },
+  "profile_validation": {
+    "shape": [
+      17000,
+      5
+    ],
+    "columns": [
+      "gender",
+      "age",
+      "id",
+      "became_member_on",
+      "income"
+    ],
+    "dtypes": {
+      "gender": "str",
+      "age": "int64",
+      "id": "str",
+      "became_member_on": "str",
+      "income": "float64"
+    },
+    "missing_values": {
+      "gender": 2175,
+      "age": 0,
+      "id": 0,
+      "became_member_on": 0,
+      "income": 2175
+    },
+    "gender_values": {
+      "M": 8484,
+      "F": 6129,
+      "O": 212
+    },
+    "valid_schema": true,
+    "issues": [
+      "Age 118 detected for 2175 records - sentinel value for missing data"
+    ],
+    "missing_gender_count": 2175,
+    "missing_income_count": 2175,
+    "age_118_count": 2175,
+    "age_stats": {
+      "min": 18,
+      "max": 101,
+      "mean": 54.39352445193929,
+      "median": 55.0
+    }
+  },
+  "transcript_validation": {
+    "shape": [
+      306534,
+      4
+    ],
+    "columns": [
+      "person",
+      "event",
+      "value",
+      "time"
+    ],
+    "dtypes": {
+      "person": "str",
+      "event": "str",
+      "value": "object",
+      "time": "int64"
+    },
+    "missing_values": {
+      "person": 0,
+      "event": 0,
+      "value": 0,
+      "time": 0
+    },
+    "event_types": {
+      "transaction": 138953,
+      "offer received": 76277,
+      "offer viewed": 57725,
+      "offer completed": 33579
+    },
+    "valid_schema": true,
+    "issues": [],
+    "time_range": {
+      "min": 0,
+      "max": 714,
+      "duration_days": 29
+    },
+    "unique_offer_ids_in_transcript": 10,
+    "transaction_count": 138953,
+    "transaction_amount_stats": {
+      "min": 0.05,
+      "max": 1062.28,
+      "mean": 12.777356156398206
+    }
+  },
+  "summary": {
+    "total_offers": 10,
+    "total_customers": 17000,
+    "total_events": 306534,
+    "unique_customers_in_transcript": 17000,
+    "date_range_days": 29,
+    "customers_not_in_transcript": 0,
+    "offers_not_in_transcript": 0,
+    "customers_in_transcript_not_in_profile": 0,
+    "offers_in_transcript_not_in_portfolio": 0
+  }
+}

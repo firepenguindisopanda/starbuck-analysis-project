@@ -1,0 +1,77 @@
+{
+  "customer_features": {
+    "count": 17000,
+    "feature_count": 43,
+    "features": [
+      "age",
+      "age_missing",
+      "age_imputed",
+      "age_bin",
+      "income",
+      "income_missing",
+      "income_imputed",
+      "income_bin",
+      "gender",
+      "gender_M",
+      "gender_F",
+      "gender_O",
+      "gender_Unknown",
+      "tenure_days",
+      "tenure_months",
+      "tenure_bin",
+      "member_year",
+      "member_month",
+      "trans_count",
+      "trans_total",
+      "trans_avg",
+      "trans_std",
+      "trans_min",
+      "trans_max",
+      "offers_received",
+      "offers_viewed",
+      "offers_completed",
+      "view_rate",
+      "completion_rate",
+      "view_to_completion_rate",
+      "bogo_received",
+      "bogo_viewed",
+      "bogo_completed",
+      "discount_received",
+      "discount_viewed",
+      "discount_completed",
+      "info_received",
+      "info_viewed",
+      "bogo_view_rate",
+      "bogo_completion_rate",
+      "discount_view_rate",
+      "discount_completion_rate",
+      "info_view_rate"
+    ]
+  },
+  "offer_features": {
+    "count": 10,
+    "feature_count": 11,
+    "features": [
+      "offer_type_normalized",
+      "offer_type_bogo",
+      "offer_type_discount",
+      "offer_type_informational",
+      "channel_email",
+      "channel_mobile",
+      "channel_social",
+      "channel_web",
+      "difficulty_x_reward",
+      "difficulty_x_duration",
+      "reward_per_day",
+      "difficulty_per_day"
+    ]
+  },
+  "interaction_features": {
+    "count": 174583,
+    "feature_count": 59,
+    "target_distribution": {
+      "0": 141004,
+      "1": 33579
+    }
+  }
+}

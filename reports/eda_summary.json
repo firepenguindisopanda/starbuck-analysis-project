@@ -1,0 +1,155 @@
+{
+  "offer_analysis": {
+    "summary": [
+      {
+        "offer_id": "9b98b8c7a33c4b65b9aebfe6a799e6d9",
+        "offer_type": "bogo",
+        "difficulty": 5,
+        "reward": 5,
+        "duration": 7.0,
+        "n_received": 7677,
+        "n_viewed": 4171,
+        "n_completed": 4354,
+        "view_rate": 0.5433111892666406,
+        "completion_rate": 0.5671486257652729,
+        "view_to_completion_rate": 1.0438743706545193
+      },
+      {
+        "offer_id": "0b1e1539f2cc45b7b9fa7c272da2e1d7",
+        "offer_type": "discount",
+        "difficulty": 20,
+        "reward": 5,
+        "duration": 10.0,
+        "n_received": 7668,
+        "n_viewed": 2663,
+        "n_completed": 3420,
+        "view_rate": 0.34728742827334375,
+        "completion_rate": 0.4460093896713615,
+        "view_to_completion_rate": 1.284265865565152
+      },
+      {
+        "offer_id": "2906b810c7d4411798c6938adc9daaa5",
+        "offer_type": "discount",
+        "difficulty": 10,
+        "reward": 2,
+        "duration": 7.0,
+        "n_received": 7632,
+        "n_viewed": 4118,
+        "n_completed": 4017,
+        "view_rate": 0.5395702306079665,
+        "completion_rate": 0.5263364779874213,
+        "view_to_completion_rate": 0.9754735308402137
+      },
+      {
+        "offer_id": "fafdcd668e3743c1bb461111dcafc2a4",
+        "offer_type": "discount",
+        "difficulty": 10,
+        "reward": 2,
+        "duration": 10.0,
+        "n_received": 7597,
+        "n_viewed": 7327,
+        "n_completed": 5317,
+        "view_rate": 0.9644596551270238,
+        "completion_rate": 0.6998815321837567,
+        "view_to_completion_rate": 0.7256721714207724
+      },
+      {
+        "offer_id": "4d5c57ea9a6940dd891ad53e9dbe8da0",
+        "offer_type": "bogo",
+        "difficulty": 10,
+        "reward": 10,
+        "duration": 5.0,
+        "n_received": 7593,
+        "n_viewed": 7298,
+        "n_completed": 3331,
+        "view_rate": 0.9611484261820098,
+        "completion_rate": 0.4386935335177137,
+        "view_to_completion_rate": 0.4564264181967662
+      },
+      {
+        "offer_id": "f19421c1d4aa40978ebb69ca19b0e20d",
+        "offer_type": "bogo",
+        "difficulty": 5,
+        "reward": 5,
+        "duration": 5.0,
+        "n_received": 7571,
+        "n_viewed": 7264,
+        "n_completed": 4296,
+        "view_rate": 0.9594505349359398,
+        "completion_rate": 0.5674283450006604,
+        "view_to_completion_rate": 0.5914096916299559
+      },
+      {
+        "offer_id": "2298d6c36e964ae4a3e7e9706d1fb8c2",
+        "offer_type": "discount",
+        "difficulty": 7,
+        "reward": 3,
+        "duration": 7.0,
+        "n_received": 7646,
+        "n_viewed": 7337,
+        "n_completed": 5156,
+        "view_rate": 0.9595867120062778,
+        "completion_rate": 0.6743395239340831,
+        "view_to_completion_rate": 0.7027395393212484
+      },
+      {
+        "offer_id": "3f207df678b143eea3cee63160fa8bed",
+        "offer_type": "informational",
+        "difficulty": 0,
+        "reward": 0,
+        "duration": 4.0,
+        "n_received": 7617,
+        "n_viewed": 4144,
+        "n_completed": 0,
+        "view_rate": 0.5440462124195877,
+        "completion_rate": 0.0,
+        "view_to_completion_rate": 0.0
+      },
+      {
+        "offer_id": "ae264e3637204a6fb9bb56bc8210ddfd",
+        "offer_type": "bogo",
+        "difficulty": 10,
+        "reward": 10,
+        "duration": 7.0,
+        "n_received": 7658,
+        "n_viewed": 6716,
+        "n_completed": 3688,
+        "view_rate": 0.8769913815617655,
+        "completion_rate": 0.48158788195351265,
+        "view_to_completion_rate": 0.5491363907087552
+      },
+      {
+        "offer_id": "5a8bc65990b245e5a138643cd4eb9837",
+        "offer_type": "informational",
+        "difficulty": 0,
+        "reward": 0,
+        "duration": 3.0,
+        "n_received": 7618,
+        "n_viewed": 6687,
+        "n_completed": 0,
+        "view_rate": 0.8777894460488317,
+        "completion_rate": 0.0,
+        "view_to_completion_rate": 0.0
+      }
+    ]
+  },
+  "funnel_analysis": {
+    "total_received": 76277,
+    "total_viewed": 57725,
+    "total_completed": 33579,
+    "view_rate": 0.7567812053436815,
+    "completion_rate": 0.4402244451145168,
+    "time_to_view_stats": "count    79329.000000\nmean        24.894679\nstd        163.199271\nmin       -576.000000\n25%          0.000000\n50%         18.000000\n75%         54.000000\nmax        714.000000\nName: time_to_view, dtype: float64"
+  },
+  "demographic_analysis": {
+    "gender_counts": {
+      "M": 8484,
+      "F": 6129,
+      "O": 212
+    }
+  },
+  "transaction_analysis": {
+    "responder_count": 12774,
+    "total_customers_with_transactions": 16578
+  }
+}

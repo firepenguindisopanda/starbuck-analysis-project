@@ -1,0 +1,32 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+
+# Generated data artifacts (keep raw JSON, exclude pipeline output)
+data/processed/
+reports/figures/
+powerbi_data/
+
+# Serialized models
+*.pkl
+*.pickle
+
+# Generated CSV reports (reports/*.json are kept for portfolio reference)
+reports/*.csv
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# OS files
+.DS_Store
+Thumbs.db

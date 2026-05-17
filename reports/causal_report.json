@@ -1,0 +1,63 @@
+{
+  "ate_results": {
+    "any_offer": {
+      "control_mean": 12.5305,
+      "treatment_mean": 12.777391692398494,
+      "control_count": 20,
+      "treatment_count": 138933,
+      "ate": 0.24689169239849384,
+      "ate_percent": 1.9703259438848715
+    },
+    "bogo": {
+      "control_mean": 12.567025146083644,
+      "treatment_mean": 12.803249300851911,
+      "control_count": 15231,
+      "treatment_count": 123722,
+      "ate": 0.23622415476826752,
+      "ate_percent": 1.879714188698698
+    },
+    "discount": {
+      "control_mean": 12.998840646957445,
+      "treatment_mean": 12.750381134604051,
+      "control_count": 15086,
+      "treatment_count": 123867,
+      "ate": -0.24845951235339392,
+      "ate_percent": -1.9113974784478123
+    },
+    "informational": {
+      "control_mean": 12.776568199804908,
+      "treatment_mean": 12.77786208934058,
+      "control_count": 54333,
+      "treatment_count": 84620,
+      "ate": 0.0012938895356722213,
+      "ate_percent": 0.010127050671493918
+    }
+  },
+  "recommendation_results": {
+    "rules": {
+      "0": {
+        "primary": "informational",
+        "secondary": null,
+        "rationale": "Unknown demographics, low engagement"
+      },
+      "1": {
+        "primary": "discount",
+        "secondary": "bogo",
+        "rationale": "High discount completion rate (69.7%)"
+      },
+      "2": {
+        "primary": "bogo",
+        "secondary": "discount",
+        "rationale": "High BOGO completion rate (70.9%)"
+      },
+      "3": {
+        "primary": "informational",
+        "secondary": null,
+        "rationale": "Low completion rates across all types"
+      }
+    },
+    "random_completion_rate": 0.43544017944844365,
+    "rule_based_completion_rate": 0.4698892156862745,
+    "lift_percent": 7.911313163949685
+  }
+}

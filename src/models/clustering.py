@@ -18,7 +18,7 @@ import seaborn as sns
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
+from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score, adjusted_rand_score
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -115,9 +115,69 @@ def preprocess_for_clustering(customer_features: pd.DataFrame) -> Tuple[pd.DataF
     return X_scaled_df, scaler, clustering_features
 
 
+def compute_gap_statistic(X: pd.DataFrame, max_k: int = 15, n_refs: int = 10) -> Tuple[List[float], List[float], int]:
+    """
+    Compute gap statistic for determining optimal number of clusters.
+    
+    Generates B reference datasets from a uniform distribution along each
+    feature axis and compares within-cluster dispersion to the reference.
+    
+    Args:
+        X: Preprocessed feature matrix
+        max_k: Maximum number of clusters to test
+        n_refs: Number of reference datasets (B in the Tibshirani paper)
+        
+    Returns:
+        Tuple of (gap_values, gap_std_errors, optimal_k_gap)
+    """
+    print("\n" + "-"*40)
+    print("Computing Gap Statistic...")
+    print("-"*40)
+    
+    X_arr = X.values if hasattr(X, 'values') else np.array(X)
+    n_samples, n_features = X_arr.shape
+    K_range = range(2, max_k + 1)
+    
+    gap_values = []
+    gap_std_errors = []
+    
+    for k in K_range:
+        km = KMeans(n_clusters=k, random_state=42, n_init=10)
+        km.fit(X_arr)
+        wcss_obs = np.log(km.inertia_)
+        
+        ref_wcss = []
+        for _ in range(n_refs):
+            reference = np.random.uniform(
+                X_arr.min(axis=0),
+                X_arr.max(axis=0),
+                size=(n_samples, n_features)
+            )
+            km_ref = KMeans(n_clusters=k, random_state=42, n_init=10)
+            km_ref.fit(reference)
+            ref_wcss.append(np.log(km_ref.inertia_))
+        
+        ref_wcss = np.array(ref_wcss)
+        gap = ref_wcss.mean() - wcss_obs
+        gap_values.append(gap)
+        gap_std_errors.append(np.sqrt(1 + 1 / n_refs) * ref_wcss.std())
+        
+        print(f"  k={k}: Gap={gap:.3f}, SE={gap_std_errors[-1]:.3f}")
+    
+    optimal_k_gap = 2
+    for i in range(len(gap_values) - 1):
+        if gap_values[i] >= gap_values[i + 1] - gap_std_errors[i + 1]:
+            optimal_k_gap = list(K_range)[i]
+            break
+    
+    print(f" Optimal k (Gap Statistic): {optimal_k_gap}")
+    return gap_values, gap_std_errors, optimal_k_gap
+
+
 def find_optimal_clusters(X: pd.DataFrame, max_k: int = 15) -> Dict[str, Any]:
     """
-    Find optimal number of clusters using elbow method and silhouette scores.
+    Find optimal number of clusters using elbow method, silhouette scores,
+    Calinski-Harabasz index, Davies-Bouldin index, and gap statistic.
     
     Args:
         X: Preprocessed feature matrix
@@ -130,9 +190,10 @@ def find_optimal_clusters(X: pd.DataFrame, max_k: int = 15) -> Dict[str, Any]:
     print("FINDING OPTIMAL NUMBER OF CLUSTERS")
     print("="*60)
     
-    wcss = []  # Within-cluster sum of squares (elbow method)
+    wcss = []
     silhouette_scores = []
     calinski_scores = []
+    db_scores = []
     
     K_range = range(2, max_k + 1)
     
@@ -143,49 +204,78 @@ def find_optimal_clusters(X: pd.DataFrame, max_k: int = 15) -> Dict[str, Any]:
         wcss.append(kmeans.inertia_)
         silhouette_scores.append(silhouette_score(X, kmeans.labels_))
         calinski_scores.append(calinski_harabasz_score(X, kmeans.labels_))
+        db_scores.append(davies_bouldin_score(X, kmeans.labels_))
         
         print(f"  k={k}: WCSS={wcss[-1]:.0f}, Silhouette={silhouette_scores[-1]:.3f}, "
-              f"Calinski={calinski_scores[-1]:.1f}")
+              f"Calinski={calinski_scores[-1]:.1f}, DB={db_scores[-1]:.3f}")
     
-    # Find optimal k (highest silhouette score)
     optimal_k_silhouette = K_range[np.argmax(silhouette_scores)]
+    optimal_k_db = K_range[np.argmin(db_scores)]
     
-    # Find elbow point (simplified: point with max second derivative)
-    # Calculate curvature (second derivative approximation)
     wcss_diff = np.diff(wcss)
     wcss_diff2 = np.diff(wcss_diff)
     optimal_k_elbow = K_range[np.argmax(wcss_diff2) + 1] if len(wcss_diff2) > 0 else 3
     
+    gap_values, gap_std_errors, optimal_k_gap = compute_gap_statistic(X, max_k=max_k)
+    
     print(f"\n Optimal k (Silhouette): {optimal_k_silhouette}")
     print(f" Optimal k (Elbow): {optimal_k_elbow}")
+    print(f" Optimal k (Davies-Bouldin): {optimal_k_db}")
+    print(f" Optimal k (Gap Statistic): {optimal_k_gap}")
     
-    # Visualize
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
     fig.suptitle('Cluster Optimization Metrics', fontsize=16, fontweight='bold')
     
-    # WCSS (Elbow)
-    axes[0].plot(K_range, wcss, 'bo-')
-    axes[0].set_xlabel('Number of Clusters (k)')
-    axes[0].set_ylabel('WCSS (Inertia)')
-    axes[0].set_title('Elbow Method')
-    axes[0].axvline(optimal_k_elbow, color='r', linestyle='--', alpha=0.5)
+    axes[0, 0].plot(K_range, wcss, 'bo-')
+    axes[0, 0].set_xlabel('Number of Clusters (k)')
+    axes[0, 0].set_ylabel('WCSS (Inertia)')
+    axes[0, 0].set_title('Elbow Method')
+    axes[0, 0].axvline(optimal_k_elbow, color='r', linestyle='--', alpha=0.5)
     
-    # Silhouette
-    axes[1].plot(K_range, silhouette_scores, 'go-')
-    axes[1].set_xlabel('Number of Clusters (k)')
-    axes[1].set_ylabel('Silhouette Score')
-    axes[1].set_title('Silhouette Scores')
-    axes[1].axvline(optimal_k_silhouette, color='r', linestyle='--', alpha=0.5)
+    axes[0, 1].plot(K_range, silhouette_scores, 'go-')
+    axes[0, 1].set_xlabel('Number of Clusters (k)')
+    axes[0, 1].set_ylabel('Silhouette Score')
+    axes[0, 1].set_title('Silhouette Scores')
+    axes[0, 1].axvline(optimal_k_silhouette, color='r', linestyle='--', alpha=0.5)
     
-    # Calinski-Harabasz
-    axes[2].plot(K_range, calinski_scores, 'mo-')
-    axes[2].set_xlabel('Number of Clusters (k)')
-    axes[2].set_ylabel('Calinski-Harabasz Index')
-    axes[2].set_title('Calinski-Harabasz (Higher is better)')
+    axes[0, 2].plot(K_range, calinski_scores, 'mo-')
+    axes[0, 2].set_xlabel('Number of Clusters (k)')
+    axes[0, 2].set_ylabel('Calinski-Harabasz Index')
+    axes[0, 2].set_title('Calinski-Harabasz (Higher is better)')
+    
+    axes[1, 0].plot(K_range, db_scores, 'ro-')
+    axes[1, 0].set_xlabel('Number of Clusters (k)')
+    axes[1, 0].set_ylabel('Davies-Bouldin Index')
+    axes[1, 0].set_title('Davies-Bouldin (Lower is better)')
+    axes[1, 0].axvline(optimal_k_db, color='g', linestyle='--', alpha=0.5)
+    
+    K_list = list(K_range)
+    axes[1, 1].plot(K_list, gap_values, 'co-')
+    axes[1, 1].fill_between(
+        K_list,
+        np.array(gap_values) - np.array(gap_std_errors),
+        np.array(gap_values) + np.array(gap_std_errors),
+        alpha=0.2, color='c'
+    )
+    axes[1, 1].set_xlabel('Number of Clusters (k)')
+    axes[1, 1].set_ylabel('Gap Statistic')
+    axes[1, 1].set_title('Gap Statistic')
+    axes[1, 1].axvline(optimal_k_gap, color='r', linestyle='--', alpha=0.5)
+    
+    axes[1, 2].axis('off')
+    summary_text = (
+        f"Optimal k Summary\n"
+        f"Elbow: {optimal_k_elbow}\n"
+        f"Silhouette: {optimal_k_silhouette}\n"
+        f"Davies-Bouldin: {optimal_k_db}\n"
+        f"Gap Statistic: {optimal_k_gap}"
+    )
+    axes[1, 2].text(0.5, 0.5, summary_text, transform=axes[1, 2].transAxes,
+                     fontsize=14, verticalalignment='center', horizontalalignment='center',
+                     bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
     
     plt.tight_layout()
     
-    # Save figure
     fig_dir = Path('reports/figures')
     fig_dir.mkdir(parents=True, exist_ok=True)
     plt.savefig(fig_dir / 'cluster_optimization.png', dpi=300, bbox_inches='tight')
@@ -196,8 +286,13 @@ def find_optimal_clusters(X: pd.DataFrame, max_k: int = 15) -> Dict[str, Any]:
         'wcss': wcss,
         'silhouette_scores': silhouette_scores,
         'calinski_scores': calinski_scores,
+        'davies_bouldin_scores': db_scores,
+        'gap_values': gap_values,
+        'gap_std_errors': gap_std_errors,
         'optimal_k_silhouette': optimal_k_silhouette,
-        'optimal_k_elbow': optimal_k_elbow
+        'optimal_k_elbow': optimal_k_elbow,
+        'optimal_k_db': optimal_k_db,
+        'optimal_k_gap': optimal_k_gap
     }
 
 
@@ -477,6 +572,439 @@ def create_cluster_visualizations(profiles_df: pd.DataFrame, df_with_clusters: p
     print(f" Cluster visualizations saved to {fig_dir}")
 
 
+def analyze_cluster_stability(X: pd.DataFrame, k: int, seeds: List[int] = None) -> Dict[str, Any]:
+    """
+    Analyze cluster stability by running K-Means with multiple random seeds
+    and computing pairwise Adjusted Rand Index.
+    
+    Args:
+        X: Preprocessed feature matrix
+        k: Number of clusters
+        seeds: List of random seeds to use (default: [42, 123, 456, 789, 2024])
+        
+    Returns:
+        Dictionary with stability analysis results
+    """
+    if seeds is None:
+        seeds = [42, 123, 456, 789, 2024]
+    
+    print("\n" + "="*60)
+    print("CLUSTER STABILITY ANALYSIS")
+    print("="*60)
+    print(f"Running K-Means k={k} with {len(seeds)} random seeds: {seeds}")
+    
+    label_sets = []
+    for seed in seeds:
+        km = KMeans(n_clusters=k, random_state=seed, n_init=10)
+        km.fit(X)
+        label_sets.append(km.labels_)
+        print(f"  Seed {seed}: inertia={km.inertia_:.1f}, "
+              f"sils={silhouette_score(X, km.labels_):.3f}")
+    
+    pairwise_ari = []
+    ari_matrix = np.zeros((len(seeds), len(seeds)))
+    for i in range(len(seeds)):
+        for j in range(i + 1, len(seeds)):
+            ari = adjusted_rand_score(label_sets[i], label_sets[j])
+            pairwise_ari.append(ari)
+            ari_matrix[i][j] = ari
+            ari_matrix[j][i] = ari
+    np.fill_diagonal(ari_matrix, 1.0)
+    
+    mean_ari = np.mean(pairwise_ari)
+    std_ari = np.std(pairwise_ari)
+    min_ari = np.min(pairwise_ari)
+    
+    if mean_ari >= 0.90:
+        interpretation = "Highly stable - clusters are robust across initializations"
+    elif mean_ari >= 0.75:
+        interpretation = "Moderately stable - most clusters are consistent"
+    elif mean_ari >= 0.50:
+        interpretation = "Marginal stability - some clusters may be unreliable"
+    else:
+        interpretation = "Low stability - cluster structure is sensitive to initialization"
+    
+    print(f"\n Pairwise ARI Statistics:")
+    print(f"  Mean ARI:  {mean_ari:.3f}")
+    print(f"  Std ARI:   {std_ari:.3f}")
+    print(f"  Min ARI:   {min_ari:.3f}")
+    print(f"  Interpretation: {interpretation}")
+    
+    fig, ax = plt.subplots(figsize=(8, 6))
+    im = ax.imshow(ari_matrix, cmap='YlOrRd', vmin=0, vmax=1)
+    ax.set_xticks(range(len(seeds)))
+    ax.set_yticks(range(len(seeds)))
+    ax.set_xticklabels([str(s) for s in seeds])
+    ax.set_yticklabels([str(s) for s in seeds])
+    ax.set_xlabel('Random Seed')
+    ax.set_ylabel('Random Seed')
+    ax.set_title(f'Cluster Stability - Pairwise ARI Matrix (Mean={mean_ari:.3f})',
+                 fontsize=13, fontweight='bold')
+    for i in range(len(seeds)):
+        for j in range(len(seeds)):
+            ax.text(j, i, f'{ari_matrix[i, j]:.2f}', ha='center', va='center',
+                    fontsize=9, color='white' if ari_matrix[i, j] > 0.5 else 'black')
+    plt.colorbar(im, ax=ax, label='Adjusted Rand Index')
+    plt.tight_layout()
+    
+    fig_dir = Path('reports/figures')
+    fig_dir.mkdir(parents=True, exist_ok=True)
+    plt.savefig(fig_dir / 'cluster_stability_ari.png', dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    return {
+        'seeds': seeds,
+        'pairwise_ari': pairwise_ari,
+        'ari_matrix': ari_matrix.tolist(),
+        'mean_ari': float(mean_ari),
+        'std_ari': float(std_ari),
+        'min_ari': float(min_ari),
+        'interpretation': interpretation
+    }
+
+
+def validate_clusters_business(customer_features: pd.DataFrame, labels: np.ndarray, k: int,
+                                fig_dir: Path = None) -> pd.DataFrame:
+    """
+    Validate clusters using business-relevant metrics.
+    
+    Computes revenue per customer, offer ROI, and churn risk proxy per cluster,
+    creates a comparison table, and generates a visualization.
+    
+    Args:
+        customer_features: Original customer features DataFrame
+        labels: Cluster labels
+        k: Number of clusters
+        fig_dir: Directory to save figures
+        
+    Returns:
+        DataFrame with business metrics per cluster
+    """
+    print("\n" + "="*60)
+    print("BUSINESS METRIC VALIDATION")
+    print("="*60)
+    
+    if fig_dir is None:
+        fig_dir = Path('reports/figures')
+        fig_dir.mkdir(parents=True, exist_ok=True)
+    
+    df = customer_features.copy()
+    df['cluster'] = labels
+    
+    reward_cols = [col for col in df.columns if 'reward' in col.lower()]
+    if reward_cols:
+        df['_total_reward_cost'] = df[reward_cols].sum(axis=1)
+    else:
+        df['_total_reward_cost'] = 0
+    
+    business_metrics = []
+    for cluster_id in range(k):
+        cluster_data = df[df['cluster'] == cluster_id]
+        n = len(cluster_data)
+        
+        total_spend = cluster_data['trans_total'].mean() if 'trans_total' in cluster_data.columns else 0
+        total_reward_cost = cluster_data['_total_reward_cost'].mean()
+        
+        if total_reward_cost > 0:
+            offer_roi = total_spend / total_reward_cost
+        else:
+            offer_roi = float('inf')
+        
+        engagement_metrics = []
+        for col_name, default in [('view_rate', 0), ('completion_rate', 0), ('trans_count', 0)]:
+            if col_name in cluster_data.columns:
+                engagement_metrics.append(cluster_data[col_name].mean())
+            else:
+                engagement_metrics.append(default)
+        churn_risk = max(0, 1 - np.mean(engagement_metrics))
+        
+        metric_row = {
+            'cluster_id': cluster_id,
+            'size': n,
+            'pct_of_total': n / len(df),
+            'revenue_per_customer': total_spend,
+            'total_reward_cost_per_customer': total_reward_cost,
+            'offer_roi': offer_roi,
+            'avg_view_rate': engagement_metrics[0],
+            'avg_completion_rate': engagement_metrics[1],
+            'avg_trans_count': engagement_metrics[2],
+            'churn_risk_proxy': churn_risk
+        }
+        business_metrics.append(metric_row)
+    
+    business_df = pd.DataFrame(business_metrics)
+    
+    business_df['offer_roi'] = business_df['offer_roi'].replace([float('inf')], 999.0)
+    
+    print("\nBusiness Metrics by Cluster:")
+    print(business_df.to_string(index=False))
+    
+    print("\nBusiness Validation Interpretation:")
+    best_revenue_cluster = business_df.loc[business_df['revenue_per_customer'].idxmax(), 'cluster_id']
+    best_roi_cluster = business_df.loc[business_df['offer_roi'].idxmax(), 'cluster_id']
+    highest_churn_cluster = business_df.loc[business_df['churn_risk_proxy'].idxmax(), 'cluster_id']
+    
+    print(f"  Highest revenue per customer: Cluster {best_revenue_cluster} "
+          f"(${business_df.loc[business_df['revenue_per_customer'].idxmax(), 'revenue_per_customer']:,.2f})")
+    print(f"  Best offer ROI: Cluster {best_roi_cluster} "
+          f"({business_df.loc[business_df['offer_roi'].idxmax(), 'offer_roi']:.2f}x)")
+    print(f"  Highest churn risk: Cluster {highest_churn_cluster} "
+          f"(proxy={business_df.loc[business_df['churn_risk_proxy'].idxmax(), 'churn_risk_proxy']:.3f})")
+    
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    fig.suptitle('Business Metrics by Cluster', fontsize=16, fontweight='bold')
+    
+    cluster_labels = [f'C{i}' for i in range(k)]
+    colors = sns.color_palette("husl", k)
+    
+    axes[0, 0].bar(cluster_labels, business_df['revenue_per_customer'], color=colors, edgecolor='black')
+    axes[0, 0].set_title('Revenue per Customer')
+    axes[0, 0].set_ylabel('Average Total Spend ($)')
+    for i, v in enumerate(business_df['revenue_per_customer']):
+        axes[0, 0].text(i, v, f'${v:,.0f}', ha='center', va='bottom', fontweight='bold')
+    
+    axes[0, 1].bar(cluster_labels, business_df['offer_roi'], color=colors, edgecolor='black')
+    axes[0, 1].set_title('Offer ROI (Spend / Reward Cost)')
+    axes[0, 1].set_ylabel('ROI Multiplier')
+    for i, v in enumerate(business_df['offer_roi']):
+        axes[0, 1].text(i, v, f'{v:.1f}x', ha='center', va='bottom', fontweight='bold')
+    
+    axes[1, 0].bar(cluster_labels, business_df['churn_risk_proxy'], color=colors, edgecolor='black')
+    axes[1, 0].set_title('Churn Risk Proxy')
+    axes[1, 0].set_ylabel('Risk Score')
+    for i, v in enumerate(business_df['churn_risk_proxy']):
+        axes[1, 0].text(i, v, f'{v:.3f}', ha='center', va='bottom', fontweight='bold')
+    
+    size_data = business_df['size'].values
+    axes[1, 1].pie(size_data, labels=cluster_labels, colors=colors,
+                    autopct='%1.1f%%', startangle=90)
+    axes[1, 1].set_title('Cluster Size Distribution')
+    
+    plt.tight_layout()
+    plt.savefig(fig_dir / 'cluster_business_metrics.png', dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    print(f" Business metrics visualization saved to {fig_dir / 'cluster_business_metrics.png'}")
+    
+    return business_df
+
+
+def generate_cluster_narratives(profiles_df: pd.DataFrame, business_df: pd.DataFrame = None,
+                                 k: int = 4) -> Dict[str, Any]:
+    """
+    Generate human-readable cluster narratives with business-friendly names
+    and actionable recommendations.
+    
+    Args:
+        profiles_df: Cluster profiles DataFrame from interpret_clusters()
+        business_df: Business metrics DataFrame from validate_clusters_business() (optional)
+        k: Number of clusters
+        
+    Returns:
+        Dictionary with narrative descriptions, segment names, and recommendations
+    """
+    print("\n" + "="*60)
+    print("CLUSTER NARRATIVES & SEGMENT NAMING")
+    print("="*60)
+    
+    NAMING_TEMPLATES = {
+        'high_value_loyalist': {
+            'name': 'High-Value Loyalists',
+            'description': 'Premium customers with high spending, strong offer engagement, '
+                           'and long tenure. These are your brand advocates.',
+            'recommendations': [
+                'Offer exclusive premium rewards to maintain loyalty',
+                'Introduce referral programs leveraging their advocacy',
+                'Test high-value personalized offers (e.g., limited-edition items)',
+                'Minimize discounting; they respond to quality, not price'
+            ]
+        },
+        'discount_seeker': {
+            'name': 'Discount Seekers',
+            'description': 'Price-sensitive customers who actively pursue and complete discount '
+                           'offers. High offer engagement but moderate spending.',
+            'recommendations': [
+                'Continue targeted discount offers to maintain engagement',
+                'Gradually introduce BOGO to shift spending upward',
+                'Monitor for offer fatigue and adjust frequency',
+                'Use bundle offers to increase average transaction value'
+            ]
+        },
+        'bogo_responder': {
+            'name': 'BOGO Responders',
+            'description': 'Customers who respond strongly to buy-one-get-one offers. '
+                           'Good engagement but may be promotion-dependent.',
+            'recommendations': [
+                'Balance BOGO frequency to avoid training only promotional purchases',
+                'Cross-sell complementary products during BOGO redemption',
+                'Introduce loyalty tier rewards alongside BOGO',
+                'Track attribution to ensure incremental spend'
+            ]
+        },
+        'low_engagement': {
+            'name': 'Low-Engagement Customers',
+            'description': 'Customers with low view and completion rates, low spending, '
+                           'and minimal offer interaction. Highest churn risk.',
+            'recommendations': [
+                'Deploy re-engagement campaigns with simpler offers',
+                'Send push notifications to increase view rates',
+                'Reduce offer complexity - focus on single-step completion',
+                'Consider win-back offers with expiration urgency'
+            ]
+        },
+        'moderate_spender': {
+            'name': 'Moderate Spenders',
+            'description': 'Average customers with moderate spending and engagement. '
+                           'No extreme behaviors; they form your dependable base.',
+            'recommendations': [
+                'Maintain baseline offer cadence to sustain engagement',
+                'Test offer types to identify pathways to higher-value behavior',
+                'Use A/B testing to find optimal offer frequency',
+                'Target upsell opportunities during regular purchasing patterns'
+            ]
+        },
+        'tenured_conservative': {
+            'name': 'Tenured Conservatives',
+            'description': 'Long-tenured customers with conservative spending patterns. '
+                           'Stable but not optimizing their value.',
+            'recommendations': [
+                'Introduce new product lines to reinvigorate interest',
+                'Leverage tenure for feedback and co-creation opportunities',
+                'Offer loyalty anniversary rewards',
+                'Test premium product trials to broaden their range'
+            ]
+        },
+        'high_income_casual': {
+            'name': 'High-Income Casuals',
+            'description': 'High-income customers with surprisingly low engagement or spending. '
+                           'Opportunity for significant value capture.',
+            'recommendations': [
+                'Offer premium experiences (reserve roastery events, etc.)',
+                'Use aspirational messaging tied to quality and craft',
+                'Reduce friction in digital ordering'    ,
+                'Personalize offers based on infrequent high-value purchases'
+            ]
+        }
+    }
+    
+    def classify_cluster(profile_row) -> str:
+        spending = profile_row.get('trans_total_mean', 0)
+        completion = profile_row.get('completion_rate_mean', 0)
+        view_rate = profile_row.get('view_rate_mean', 0)
+        bogo_comp = profile_row.get('bogo_completion_rate_mean', 0)
+        discount_comp = profile_row.get('discount_completion_rate_mean', 0)
+        tenure = profile_row.get('tenure_months_mean', 0)
+        income = profile_row.get('income_imputed_mean', 0)
+        
+        median_spend = profiles_df['trans_total_mean'].median() if 'trans_total_mean' in profiles_df.columns else spending
+        median_completion = profiles_df['completion_rate_mean'].median() if 'completion_rate_mean' in profiles_df.columns else completion
+        median_income = profiles_df['income_imputed_mean'].median() if 'income_imputed_mean' in profiles_df.columns else income
+        median_tenure = profiles_df['tenure_months_mean'].median() if 'tenure_months_mean' in profiles_df.columns else tenure
+        
+        if spending > median_spend and completion > median_completion:
+            return 'high_value_loyalist'
+        elif completion < 0.30 or view_rate < 0.40:
+            return 'low_engagement'
+        elif bogo_comp > discount_comp and bogo_comp > 0.50:
+            return 'bogo_responder'
+        elif discount_comp > bogo_comp and discount_comp > 0.50:
+            return 'discount_seeker'
+        elif income > median_income and spending <= median_spend:
+            return 'high_income_casual'
+        elif tenure > median_tenure and spending <= median_spend:
+            return 'tenured_conservative'
+        else:
+            return 'moderate_spender'
+    
+    narratives = {}
+    segment_assignments = {}
+    
+    assigned_types = []
+    for _, row in profiles_df.iterrows():
+        cluster_type = classify_cluster(row)
+        if cluster_type in assigned_types:
+            cluster_type = 'moderate_spender'
+        assigned_types.append(cluster_type)
+    
+    for i, (_, row) in enumerate(profiles_df.iterrows()):
+        cluster_id = int(row['cluster_id'])
+        cluster_type = assigned_types[i]
+        template = NAMING_TEMPLATES[cluster_type]
+        
+        narrative = {
+            'cluster_id': cluster_id,
+            'segment_name': template['name'],
+            'segment_type': cluster_type,
+            'size': int(row['size']),
+            'pct_of_total': float(row['size'] / profiles_df['size'].sum()),
+            'description': template['description'],
+            'key_characteristics': {}
+        }
+        
+        char_metrics = {
+            'age': row.get('age_imputed_mean'),
+            'income': row.get('income_imputed_mean'),
+            'tenure_months': row.get('tenure_months_mean'),
+            'avg_spend': row.get('trans_total_mean'),
+            'avg_transaction': row.get('trans_avg_mean'),
+            'view_rate': row.get('view_rate_mean'),
+            'completion_rate': row.get('completion_rate_mean'),
+            'bogo_completion_rate': row.get('bogo_completion_rate_mean'),
+            'discount_completion_rate': row.get('discount_completion_rate_mean')
+        }
+        narrative['key_characteristics'] = {mk: mv for mk, mv in char_metrics.items() if mv is not None and not (isinstance(mv, float) and np.isnan(mv))}
+        
+        if business_df is not None:
+            biz_row = business_df[business_df['cluster_id'] == cluster_id]
+            if len(biz_row) > 0:
+                biz_row = biz_row.iloc[0]
+                narrative['business_metrics'] = {
+                    'revenue_per_customer': float(biz_row['revenue_per_customer']),
+                    'offer_roi': float(biz_row['offer_roi']),
+                    'churn_risk_proxy': float(biz_row['churn_risk_proxy'])
+                }
+        
+        narrative['recommendations'] = template['recommendations']
+        narratives[f'cluster_{cluster_id}'] = narrative
+        segment_assignments[cluster_id] = template['name']
+    
+    for key, narrative in narratives.items():
+        print(f"\n{'─'*50}")
+        print(f"  CLUSTER {narrative['cluster_id']}: {narrative['segment_name']}")
+        print(f"{'─'*50}")
+        print(f"  Size: {narrative['size']} customers ({narrative['pct_of_total']:.1%})")
+        print(f"  {narrative['description']}")
+        print(f"  Key Characteristics:")
+        for metric, value in narrative['key_characteristics'].items():
+            if metric in ['age', 'income', 'tenure_months', 'avg_spend', 'avg_transaction']:
+                print(f"    {metric}: {value:,.2f}")
+            else:
+                print(f"    {metric}: {value:.2%}" if value and value < 1 else f"    {metric}: {value}")
+        if 'business_metrics' in narrative:
+            bm = narrative['business_metrics']
+            print(f"  Business Metrics:")
+            print(f"    Revenue/Customer: ${bm['revenue_per_customer']:,.2f}")
+            print(f"    Offer ROI: {bm['offer_roi']:.1f}x")
+            print(f"    Churn Risk: {bm['churn_risk_proxy']:.3f}")
+        print(f"  Recommendations:")
+        for rec in narrative['recommendations']:
+            print(f"    to {rec}")
+    
+    segment_df = pd.DataFrame([
+        {'cluster_id': n['cluster_id'], 'segment_name': n['segment_name'],
+         'segment_type': n['segment_type'], 'size': n['size']}
+        for n in narratives.values()
+    ])
+    segment_df.to_csv(Path('data/processed') / 'segment_names.csv', index=False)
+    
+    print(f"\n Segment names saved to data/processed/segment_names.csv")
+    
+    return {
+        'narratives': narratives,
+        'segment_assignments': segment_assignments
+    }
+
+
 def save_clustering_results(df_with_clusters: pd.DataFrame, profiles_df: pd.DataFrame, 
                              optimization_results: Dict, k: int, base_path: str = '.') -> None:
     """
@@ -506,7 +1034,10 @@ def save_clustering_results(df_with_clusters: pd.DataFrame, profiles_df: pd.Data
 
 
 def generate_clustering_report(profiles_df: pd.DataFrame, optimization_results: Dict, 
-                                k: int, output_path: str = 'reports/clustering_report.json') -> None:
+                                k: int, stability_results: Dict = None,
+                                business_df: pd.DataFrame = None,
+                                narrative_results: Dict = None,
+                                output_path: str = 'reports/clustering_report.json') -> None:
     """
     Generate a comprehensive clustering report.
     
@@ -514,18 +1045,42 @@ def generate_clustering_report(profiles_df: pd.DataFrame, optimization_results: 
         profiles_df: Cluster profiles DataFrame
         optimization_results: Optimization results
         k: Number of clusters
+        stability_results: Results from analyze_cluster_stability() (optional)
+        business_df: Business metrics DataFrame (optional)
+        narrative_results: Results from generate_cluster_narratives() (optional)
         output_path: Path to save the report
     """
+    opt_idx = k - 2
     report = {
         'method': 'K-Means',
         'optimal_k': k,
         'optimization': {
-            'silhouette_score': optimization_results['silhouette_scores'][k-2],  # k-2 because range starts at 2
-            'calinski_score': optimization_results['calinski_scores'][k-2],
-            'wcss': optimization_results['wcss'][k-2]
+            'silhouette_score': optimization_results['silhouette_scores'][opt_idx],
+            'calinski_score': optimization_results['calinski_scores'][opt_idx],
+            'davies_bouldin_score': optimization_results['davies_bouldin_scores'][opt_idx],
+            'wcss': optimization_results['wcss'][opt_idx],
+            'optimal_k_silhouette': optimization_results['optimal_k_silhouette'],
+            'optimal_k_elbow': optimization_results['optimal_k_elbow'],
+            'optimal_k_db': optimization_results['optimal_k_db'],
+            'optimal_k_gap': optimization_results['optimal_k_gap']
         },
         'cluster_profiles': profiles_df.to_dict('records')
     }
+    
+    if stability_results is not None:
+        report['stability'] = {
+            'mean_ari': stability_results['mean_ari'],
+            'std_ari': stability_results['std_ari'],
+            'min_ari': stability_results['min_ari'],
+            'interpretation': stability_results['interpretation']
+        }
+    
+    if business_df is not None:
+        report['business_metrics'] = business_df.to_dict('records')
+    
+    if narrative_results is not None:
+        report['segment_narratives'] = narrative_results['narratives']
+        report['segment_assignments'] = narrative_results['segment_assignments']
     
     with open(output_path, 'w') as f:
         json.dump(report, f, indent=2, default=str)
@@ -538,55 +1093,55 @@ if __name__ == "__main__":
     print("STARBUCKS CUSTOMER SEGMENTATION - CLUSTERING")
     print("="*60)
     
-    # Setup
     fig_dir = Path('reports/figures')
     fig_dir.mkdir(parents=True, exist_ok=True)
     
-    # Load customer features
     print("\nLoading customer features...")
     customer_features = load_customer_features()
     print(f" Loaded {len(customer_features)} customers with {len(customer_features.columns)-1} features")
     
-    # Preprocess for clustering
     X_scaled, scaler, feature_names = preprocess_for_clustering(customer_features)
     
-    # Find optimal number of clusters
     optimization_results = find_optimal_clusters(X_scaled, max_k=10)
     optimal_k = optimization_results['optimal_k_silhouette']
     
-    # Apply K-Means with optimal k
-    # Let's use k=4 for business interpretability (3-5 clusters as per research question)
-    k = 4  # Balance between statistical optimality and business interpretability
+    k = 4
     print(f"\nUsing k={k} clusters for business interpretability")
     
     result_df, kmeans_model = apply_kmeans_clustering(X_scaled, k, feature_names)
     
-    # Get cluster labels
     labels = result_df['cluster'].values
     
-    # Add cluster labels to original customer features
     customer_with_clusters = customer_features.copy()
     customer_with_clusters['cluster'] = labels
     
-    # Visualize clusters
+    stability_results = analyze_cluster_stability(X_scaled, k)
+    
     visualize_clusters_pca(X_scaled, labels, k, fig_dir)
     
-    # Interpret clusters
     profiles_df = interpret_clusters(customer_features, labels, k)
     
-    # Create visualizations
     create_cluster_visualizations(profiles_df, customer_with_clusters, fig_dir)
     
-    # Save results
+    business_df = validate_clusters_business(customer_features, labels, k, fig_dir)
+    
+    narrative_results = generate_cluster_narratives(profiles_df, business_df, k)
+    
     save_clustering_results(customer_with_clusters, profiles_df, optimization_results, k)
     
-    # Generate report
-    generate_clustering_report(profiles_df, optimization_results, k)
+    generate_clustering_report(profiles_df, optimization_results, k,
+                               stability_results=stability_results,
+                               business_df=business_df,
+                               narrative_results=narrative_results)
     
     print("\n" + "="*60)
     print("CLUSTERING COMPLETE")
     print("="*60)
     print(f" Identified {k} customer segments")
+    print(f" Stability: Mean ARI = {stability_results['mean_ari']:.3f} ({stability_results['interpretation']})")
+    for cid, name in narrative_results['segment_assignments'].items():
+        size = int(profiles_df.loc[profiles_df['cluster_id'] == cid, 'size'].values[0])
+        print(f"  Cluster {cid}: {name} ({size} customers)")
     print(f" Visualizations saved to: {fig_dir}")
     print(f" Results saved to: data/processed/")
     print("="*60)

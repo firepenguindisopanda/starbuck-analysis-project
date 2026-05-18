@@ -1,23 +1,36 @@
 """
 Power BI Export Module for Starbucks Customer Segmentation Project.
 
-This module exports all relevant data to CSV files optimized for Power BI import.
-Power BI can directly consume CSV files and create interactive dashboards.
+This module exports all relevant data to CSV files optimized for Power BI import,
+using a proper star schema design with fact and dimension tables.
 
 Why Power BI?
 - Demonstrates business intelligence skills (not just Python)
 - Creates executive-ready dashboards
 - Shows ability to work with enterprise BI tools
 - Complements Python/ML work with visual analytics
+
+Star Schema Design:
+- Fact tables: fact_offer_interactions, fact_kpi_metrics, fact_segment_performance
+- Dimension tables: dim_customers, dim_offers, dim_date
+- Supporting tables: customers (legacy), offers, transactions, offer_events,
+  cluster_profiles, model_performance, ate_results, recommendation_results
 """
 
 import pandas as pd
 import numpy as np
 from pathlib import Path
 import json
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import warnings
 warnings.filterwarnings('ignore')
+
+CLUSTER_LABELS = {
+    0: 'Unknown Demographics',
+    1: 'Discount Responders',
+    2: 'BOGO Responders',
+    3: 'Low Engagement'
+}
 
 
 def export_customer_data(base_path: str = '.') -> pd.DataFrame:
@@ -344,26 +357,301 @@ def export_recommendation_results(base_path: str = '.') -> pd.DataFrame:
     return rec_export
 
 
+def export_fact_offer_interactions(base_path: str = '.') -> pd.DataFrame:
+    """
+    Create the core fact table for the star schema.
+
+    Each row represents one offer interaction event (received, viewed, or completed)
+    with proper foreign keys linking to dim_customers, dim_offers, and dim_date.
+
+    Returns:
+        Fact offer interactions DataFrame
+    """
+    print("\nExporting fact_offer_interactions (star schema fact table)...")
+
+    transcript = pd.read_json(Path(base_path) / 'transcript.json', lines=True)
+
+    offer_events = transcript[transcript['event'].isin(['offer received', 'offer viewed', 'offer completed'])].copy()
+
+    offer_events['offer_id'] = offer_events['value'].apply(
+        lambda x: x.get('offer id') or x.get('offer_id') if isinstance(x, dict) else None
+    )
+    offer_events = offer_events[offer_events['offer_id'].notna()].copy()
+
+    offer_events = offer_events.rename(columns={
+        'person': 'customer_id',
+        'event': 'event_type',
+        'time': 'time_hours'
+    })
+
+    offer_events['event_type'] = offer_events['event_type'].str.replace('offer ', '')
+
+    offer_events['event_date'] = pd.to_datetime('2018-07-26') - pd.to_timedelta(offer_events['time_hours'], unit='h')
+
+    offer_events['event_date_key'] = offer_events['event_date'].dt.strftime('%Y-%m-%d')
+
+    offer_events['day_since_start'] = offer_events['time_hours'] // 24
+
+    fact = offer_events[['customer_id', 'offer_id', 'event_type',
+                          'time_hours', 'event_date', 'event_date_key',
+                          'day_since_start']].copy()
+
+    fact = fact.drop_duplicates().reset_index(drop=True)
+
+    print(f" Exported {len(fact)} fact offer interactions")
+    return fact
+
+
+def export_dim_customers(base_path: str = '.') -> pd.DataFrame:
+    """
+    Create the customer dimension table for the star schema.
+
+    Rows: one per customer, with demographics, cluster info,
+    engagement level, RFM segment, and CLV proxy.
+
+    Returns:
+        Customer dimension DataFrame
+    """
+    print("\nExporting dim_customers (star schema dimension)...")
+
+    customers = pd.read_csv(Path(base_path) / 'data' / 'processed' / 'customer_features.csv')
+    clusters = pd.read_csv(Path(base_path) / 'data' / 'processed' / 'customer_clusters.csv')
+
+    dim = customers.merge(clusters, on='id', how='left')
+
+    # RFM score is already in customer_features.csv from feature engineering
+    # No need to merge from a separate file
+
+    dim['cluster_label'] = dim['cluster'].map(CLUSTER_LABELS)
+
+    dim['engagement_level'] = pd.cut(
+        dim['completion_rate'],
+        bins=[-0.001, 0.3, 0.6, 1.0],
+        labels=['Low', 'Medium', 'High']
+    )
+
+    def _rfm_segment(score):
+        if pd.isna(score):
+            return 'Unknown'
+        if score >= 9:
+            return 'Champions'
+        if score >= 7:
+            return 'Loyal'
+        if score >= 5:
+            return 'Potential'
+        if score >= 3:
+            return 'At Risk'
+        return 'Lost'
+
+    dim['rfm_segment'] = dim['rfm_score'].apply(_rfm_segment)
+
+    dim = dim.rename(columns={'id': 'customer_id'})
+
+    cols = [
+        'customer_id', 'age_imputed', 'income_imputed', 'gender',
+        'tenure_months', 'cluster', 'cluster_label',
+        'engagement_level', 'rfm_segment', 'clv_proxy',
+        'completion_rate', 'view_rate', 'trans_total', 'trans_avg', 'trans_count'
+    ]
+    existing = [c for c in cols if c in dim.columns]
+    dim = dim[existing].copy()
+
+    print(f" Exported {len(dim)} customer dimension rows with {len(dim.columns)} columns")
+    return dim
+
+
+def export_dim_offers(base_path: str = '.') -> pd.DataFrame:
+    """
+    Create the offer dimension table for the star schema.
+
+    Rows: one per offer (not exploded by channel), with
+    channel flags, derived metrics, and offer_type_category.
+
+    Returns:
+        Offer dimension DataFrame
+    """
+    print("\nExporting dim_offers (star schema dimension)...")
+
+    portfolio = pd.read_json(Path(base_path) / 'portfolio.json', lines=True)
+
+    dim = portfolio.rename(columns={
+        'id': 'offer_id',
+        'duration': 'duration_days'
+    })
+
+    channel_lists = dim['channels'].copy()
+    dim['channel_email'] = channel_lists.apply(lambda x: 'email' in x if isinstance(x, list) else False)
+    dim['channel_mobile'] = channel_lists.apply(lambda x: 'mobile' in x if isinstance(x, list) else False)
+    dim['channel_social'] = channel_lists.apply(lambda x: 'social' in x if isinstance(x, list) else False)
+    dim['channel_web'] = channel_lists.apply(lambda x: 'web' in x if isinstance(x, list) else False)
+
+    dim['reward_per_day'] = dim['reward'] / dim['duration_days'].replace(0, np.nan)
+    dim['difficulty_per_day'] = dim['difficulty'] / dim['duration_days'].replace(0, np.nan)
+
+    dim['channel_count'] = channel_lists.apply(len)
+
+    def _offer_category(offer_type):
+        if offer_type in ('bogo', 'discount'):
+            return 'Promotional'
+        return 'Informational'
+
+    dim['offer_type_category'] = dim['offer_type'].apply(_offer_category)
+
+    dim = dim.drop(columns=['channels'])
+
+    print(f" Exported {len(dim)} offer dimension rows with {len(dim.columns)} columns")
+    return dim
+
+
+def export_fact_kpi_metrics(base_path: str = '.') -> pd.DataFrame:
+    """
+    Create a pre-computed KPI metrics table for Power BI card visuals.
+
+    Returns:
+        KPI metrics DataFrame (one row per metric)
+    """
+    print("\nExporting fact_kpi_metrics (pre-computed KPIs)...")
+
+    customers = pd.read_csv(Path(base_path) / 'data' / 'processed' / 'customer_features.csv')
+
+    with open(Path(base_path) / 'data' / 'processed' / 'model_metrics.json', 'r') as f:
+        model_metrics = json.load(f)
+
+    with open(Path(base_path) / 'reports' / 'causal_report.json', 'r') as f:
+        causal_data = json.load(f)
+
+    with open(Path(base_path) / 'data' / 'processed' / 'recommendation_results.json', 'r') as f:
+        rec_data = json.load(f)
+
+    ate_results = causal_data.get('ate_results', {})
+
+    rows = [
+        {'metric_name': 'Total Customers', 'metric_value': len(customers), 'metric_category': 'Customer', 'format': 'Whole Number'},
+        {'metric_name': 'Total Revenue', 'metric_value': customers['trans_total'].sum(), 'metric_category': 'Financial', 'format': 'Currency'},
+        {'metric_name': 'Average Completion Rate', 'metric_value': customers['completion_rate'].mean(), 'metric_category': 'Engagement', 'format': 'Percentage'},
+        {'metric_name': 'Average View Rate', 'metric_value': customers['view_rate'].mean(), 'metric_category': 'Engagement', 'format': 'Percentage'},
+        {'metric_name': 'Average Transaction Amount', 'metric_value': customers['trans_avg'].mean(), 'metric_category': 'Financial', 'format': 'Currency'},
+        {'metric_name': 'Model AUC-ROC', 'metric_value': model_metrics.get('auc_roc', 0), 'metric_category': 'Model', 'format': 'Decimal'},
+        {'metric_name': 'Recommendation Lift %', 'metric_value': rec_data.get('lift_percent', 0), 'metric_category': 'Business', 'format': 'Percentage'},
+    ]
+
+    for offer_type in ('bogo', 'discount', 'informational'):
+        key = offer_type
+        if key in ate_results:
+            rows.append({
+                'metric_name': f'ATE {offer_type.title()}',
+                'metric_value': ate_results[key].get('ate', 0),
+                'metric_category': 'Causal Impact',
+                'format': 'Currency'
+            })
+
+    for offer_type in ('bogo', 'discount', 'informational'):
+        key = offer_type
+        if key in ate_results:
+            rows.append({
+                'metric_name': f'ATE {offer_type.title()} %',
+                'metric_value': ate_results[key].get('ate_percent', 0),
+                'metric_category': 'Causal Impact',
+                'format': 'Percentage'
+            })
+
+    kpi = pd.DataFrame(rows)
+
+    print(f" Exported {len(kpi)} KPI metrics")
+    return kpi
+
+
+def export_fact_segment_performance(base_path: str = '.') -> pd.DataFrame:
+    """
+    Create pre-aggregated segment performance metrics for Power BI.
+
+    Returns:
+        Segment performance DataFrame (one row per cluster)
+    """
+    print("\nExporting fact_segment_performance (pre-aggregated segments)...")
+
+    customers = pd.read_csv(Path(base_path) / 'data' / 'processed' / 'customer_features.csv')
+    clusters = pd.read_csv(Path(base_path) / 'data' / 'processed' / 'customer_clusters.csv')
+
+    dim = customers.merge(clusters, on='id', how='left')
+
+    with open(Path(base_path) / 'data' / 'processed' / 'recommendation_results.json', 'r') as f:
+        rec_data = json.load(f)
+
+    rules = rec_data.get('rules', {})
+
+    completion_by_type = rec_data.get('completion_by_type', {})
+
+    seg = dim.groupby('cluster').agg(
+        segment_size=('id', 'count'),
+        avg_completion_rate=('completion_rate', 'mean'),
+        avg_view_rate=('view_rate', 'mean'),
+        avg_transaction_amount=('trans_avg', 'mean'),
+        avg_income=('income_imputed', 'mean'),
+        avg_age=('age_imputed', 'mean'),
+        total_revenue=('trans_total', 'sum'),
+    ).reset_index()
+
+    seg['revenue_per_customer'] = seg['total_revenue'] / seg['segment_size']
+
+    seg['cluster_label'] = seg['cluster'].map(CLUSTER_LABELS)
+
+    def _best_offer(cluster_id):
+        rule = rules.get(str(int(cluster_id)), {})
+        return rule.get('primary', 'unknown')
+
+    seg['best_offer_type'] = seg['cluster'].apply(_best_offer)
+
+    def _best_completion(cluster_id):
+        if cluster_id == 0:
+            return completion_by_type.get('informational', 0)
+        elif cluster_id == 1:
+            return completion_by_type.get('discount', 0)
+        elif cluster_id == 2:
+            return completion_by_type.get('bogo', 0)
+        else:
+            return max(completion_by_type.values()) if completion_by_type else 0
+
+    seg['best_offer_completion_rate'] = seg['cluster'].apply(_best_completion)
+
+    seg = seg.rename(columns={'cluster': 'cluster_id'})
+
+    cols = [
+        'cluster_id', 'cluster_label', 'segment_size',
+        'avg_completion_rate', 'avg_view_rate', 'avg_transaction_amount',
+        'avg_income', 'avg_age',
+        'total_revenue', 'revenue_per_customer',
+        'best_offer_type', 'best_offer_completion_rate'
+    ]
+    seg = seg[cols]
+
+    print(f" Exported {len(seg)} segment performance rows")
+    return seg
+
+
 def export_calendar_table() -> pd.DataFrame:
     """
-    Export a calendar/date dimension table for Power BI time intelligence.
+    Export an enhanced calendar/date dimension table for Power BI time intelligence.
 
-    Covers the full date range present in the transaction and offer event data
-    (approximately 2018-06-27 to 2018-07-26), padded slightly.
+    Includes fiscal quarter, is_holiday_period flags, and day number since start.
 
     Returns:
         Calendar DataFrame with date attributes
     """
-    print("\nExporting calendar table...")
+    print("\nExporting enhanced calendar table (dim_date)...")
 
     start_date = pd.Timestamp('2018-06-01')
     end_date = pd.Timestamp('2018-07-31')
     dates = pd.date_range(start=start_date, end=end_date, freq='D')
 
+    campaign_start = pd.Timestamp('2018-06-27')
+
     calendar = pd.DataFrame({
         'date': dates,
+        'date_key': dates.strftime('%Y-%m-%d'),
         'year': dates.year,
         'quarter': dates.quarter,
+        'fiscal_quarter': 'FQ' + dates.quarter.astype(str),
         'month': dates.month,
         'month_name': dates.strftime('%B'),
         'day': dates.day,
@@ -371,7 +659,10 @@ def export_calendar_table() -> pd.DataFrame:
         'day_name': dates.strftime('%A'),
         'week_of_year': dates.isocalendar().week.astype(int),
         'is_weekend': dates.dayofweek >= 5,
-        'is_weekday': dates.dayofweek < 5
+        'is_weekday': dates.dayofweek < 5,
+        'is_holiday_period': ((dates >= pd.Timestamp('2018-07-01')) &
+                              (dates <= pd.Timestamp('2018-07-07'))),
+        'day_since_start': (dates - campaign_start).days
     })
 
     print(f" Exported {len(calendar)} calendar dates ({start_date.date()} to {end_date.date()})")
@@ -379,7 +670,7 @@ def export_calendar_table() -> pd.DataFrame:
     return calendar
 
 
-def save_all_exports(base_path: str = '.') -> None:
+def save_all_exports(base_path: str = '.') -> Tuple[Path, Dict[str, pd.DataFrame]]:
     """
     Save all exported DataFrames to CSV files for Power BI.
     
@@ -393,8 +684,18 @@ def save_all_exports(base_path: str = '.') -> None:
     export_dir = Path(base_path) / 'powerbi_data'
     export_dir.mkdir(parents=True, exist_ok=True)
     
-    # Export all datasets
-    datasets = {
+    # Star schema tables (primary)
+    star_schema_datasets = {
+        'fact_offer_interactions': export_fact_offer_interactions(base_path),
+        'fact_kpi_metrics': export_fact_kpi_metrics(base_path),
+        'fact_segment_performance': export_fact_segment_performance(base_path),
+        'dim_customers': export_dim_customers(base_path),
+        'dim_offers': export_dim_offers(base_path),
+        'dim_date': export_calendar_table(),
+    }
+
+    # Legacy / supporting tables (kept for backward compatibility)
+    legacy_datasets = {
         'customers': export_customer_data(base_path),
         'offers': export_offer_data(base_path),
         'transactions': export_transaction_data(base_path),
@@ -403,8 +704,9 @@ def save_all_exports(base_path: str = '.') -> None:
         'model_performance': export_model_performance(base_path),
         'ate_results': export_ate_results(base_path),
         'recommendation_results': export_recommendation_results(base_path),
-        'dim_date': export_calendar_table()
     }
+
+    datasets = {**star_schema_datasets, **legacy_datasets}
     
     # Save to CSV
     for name, df in datasets.items():
@@ -429,7 +731,8 @@ def save_all_exports(base_path: str = '.') -> None:
 
 def create_powerbi_instructions(export_dir: Path, datasets: Dict[str, pd.DataFrame]) -> None:
     """
-    Create instructions for importing data into Power BI.
+    Create instructions for importing data into Power BI, including star schema,
+    new fact/dimension tables, and updated DAX measures.
 
     Args:
         export_dir: Directory where CSV files are saved
@@ -440,85 +743,150 @@ def create_powerbi_instructions(export_dir: Path, datasets: Dict[str, pd.DataFra
 
 ## Overview
 This folder contains CSV files exported from the Starbucks Customer Segmentation project,
-optimized for import into Microsoft Power BI.
+organized as a **star schema** optimized for Power BI import and DAX time-intelligence.
+
+### Star Schema Architecture
+```
+                    ┌──────────────────┐
+                    │   dim_date        │
+                    │ (date dimension)  │
+                    └────────┬─────────┘
+                             │
+        ┌────────────────────┼────────────────────┐
+        │                    │                    │
+        ▼                    ▼                    ▼
+┌───────────────┐  ┌──────────────────┐  ┌───────────────┐
+│ dim_customers │  │fact_offer_inter-  │  │  dim_offers   │
+│(customer dim) │◄─┤   actions         │─►│ (offer dim)   │
+└───────────────┘  │ (core fact table) │  └───────────────┘
+                   └──────────────────┘
+                            │
+                            ▼
+                ┌───────────────────────┐
+                │ fact_kpi_metrics      │
+                │ (pre-computed KPIs)   │
+                └───────────────────────┘
+                            │
+                            ▼
+                ┌───────────────────────┐
+                │fact_segment_performance│
+                │ (pre-aggregated segs) │
+                └───────────────────────┘
+```
 
 ## Files Included
 
-### Fact / Transaction Tables
-1. **customers.csv** - Customer master data with cluster assignments
-   - {len(d['customers']):,} rows × {len(d['customers'].columns)} columns
-   - Key fields: customer_id, age, income, cluster_label, completion_rate, engagement_level
+### Star Schema Tables (Primary - use these for dashboards)
 
-2. **offers.csv** - Offer master data with channels (exploded per channel)
-   - {len(d['offers']):,} rows × {len(d['offers'].columns)} columns
-   - Key fields: offer_id, offer_type, difficulty, reward, duration_days, channel
+#### Fact Tables
+1. **fact_offer_interactions.csv** - Core fact table: one row per offer event
+   - {len(d['fact_offer_interactions']):,} rows × {len(d['fact_offer_interactions'].columns)} columns
+   - Key fields: customer_id (FKtodim_customers), offer_id (FKtodim_offers), event_date (FKtodim_date), event_type, time_hours, day_since_start
 
-3. **transactions.csv** - Transaction data (138K purchase events)
-   - {len(d['transactions']):,} rows × {len(d['transactions'].columns)} columns
-   - Key fields: customer_id, transaction_amount, transaction_date, day_of_week
+2. **fact_kpi_metrics.csv** - Pre-computed KPI card values
+   - {len(d['fact_kpi_metrics']):,} rows × {len(d['fact_kpi_metrics'].columns)} columns
+   - Key fields: metric_name, metric_value, metric_category, format
 
-4. **offer_events.csv** - Offer lifecycle events (received → viewed → completed)
-   - {len(d['offer_events']):,} rows × {len(d['offer_events'].columns)} columns
-   - Key fields: customer_id, offer_id, event_type, event_date
+3. **fact_segment_performance.csv** - Pre-aggregated segment KPIs
+   - {len(d['fact_segment_performance']):,} rows × {len(d['fact_segment_performance'].columns)} columns
+   - Key fields: cluster_id, cluster_label, segment_size, avg_completion_rate, total_revenue, best_offer_type
 
-### Dimension / Summary Tables
-5. **dim_date.csv** - Calendar date dimension for time-intelligence DAX
+#### Dimension Tables
+4. **dim_customers.csv** - Customer dimension (one row per customer)
+   - {len(d['dim_customers']):,} rows × {len(d['dim_customers'].columns)} columns
+   - Key fields: customer_id (PK), age, income, gender, tenure_months, cluster, cluster_label, engagement_level, rfm_segment, clv_proxy
+
+5. **dim_offers.csv** - Offer dimension (one row per offer, not exploded)
+   - {len(d['dim_offers']):,} rows × {len(d['dim_offers'].columns)} columns
+   - Key fields: offer_id (PK), offer_type, difficulty, reward, duration_days, reward_per_day, difficulty_per_day, channel_email/mobile/social/web, offer_type_category
+
+6. **dim_date.csv** - Enhanced calendar dimension for time-intelligence
    - {len(d['dim_date']):,} rows × {len(d['dim_date'].columns)} columns
-   - Key fields: date, year, quarter, month, day_of_week, is_weekend
+   - Key fields: date, date_key, year, quarter, fiscal_quarter, month, day_of_week, is_weekend, is_holiday_period, day_since_start
 
-6. **cluster_profiles.csv** - Cluster profile metrics (long format)
-   - {len(d['cluster_profiles']):,} rows × {len(d['cluster_profiles'].columns)} columns
-   - Key fields: cluster_id, cluster_label, metric, value
+### Legacy / Supporting Tables
+7. **customers.csv** - Flat customer data (backward-compatible)
+   - {len(d['customers']):,} rows × {len(d['customers'].columns)} columns
 
-7. **model_performance.csv** - Model comparison metrics (long format)
-   - {len(d['model_performance']):,} rows × {len(d['model_performance'].columns)} columns
-   - Key fields: model_name, metric, value
+8. **offers.csv** - Offer data with channels (exploded, backward-compatible)
+   - {len(d['offers']):,} rows × {len(d['offers'].columns)} columns
 
-8. **ate_results.csv** - Causal inference (Average Treatment Effect)
-   - {len(d['ate_results']):,} rows × {len(d['ate_results'].columns)} columns
-   - Key fields: offer_type, control_mean, treatment_mean, ate_dollars, ate_percent
+9. **transactions.csv** - Transaction events
+   - {len(d['transactions']):,} rows × {len(d['transactions'].columns)} columns
 
-9. **recommendation_results.csv** - Recommendation system performance
-   - {len(d['recommendation_results']):,} rows × {len(d['recommendation_results'].columns)} columns
-   - Key fields: method, completion_rate, lift_percent
+10. **offer_events.csv** - Offer events (flat, backward-compatible)
+    - {len(d['offer_events']):,} rows × {len(d['offer_events'].columns)} columns
+
+11. **cluster_profiles.csv** - Cluster profile metrics (long format)
+    - {len(d['cluster_profiles']):,} rows × {len(d['cluster_profiles'].columns)} columns
+
+12. **model_performance.csv** - Model comparison metrics (long format)
+    - {len(d['model_performance']):,} rows × {len(d['model_performance'].columns)} columns
+
+13. **ate_results.csv** - Causal inference (Average Treatment Effect)
+    - {len(d['ate_results']):,} rows × {len(d['ate_results'].columns)} columns
+
+14. **recommendation_results.csv** - Recommendation system performance
+    - {len(d['recommendation_results']):,} rows × {len(d['recommendation_results'].columns)} columns
 
 ## Power BI Import Steps
 
-### Option A: Get Data → Text/CSV (one at a time)
-- Click "Get Data" → "Text/CSV"
+### Option A: Get Data to Text/CSV (one at a time)
+- Click "Get Data" to "Text/CSV"
 - Navigate to `{export_dir}`, select a CSV, click "Load"
 
-### Option B: Get Data → Folder (all at once, recommended)
-- Click "Get Data" → "Folder"
+### Option B: Get Data to Folder (all at once, recommended)
+- Click "Get Data" to "Folder"
 - Navigate to `{export_dir}`, click "OK"
-- In Power Query: Click "Combine & Load" → "Combine & Load To..."
+- In Power Query: Click "Combine & Load" to "Combine & Load To..."
 - This auto-merges all CSVs into separate query tables
 
-### 3. Power Query Data Type Fixes
+### Power Query Data Type Fixes
 | Table | Column | Set Type To |
 |---|---|---|
-| customers | age, income | Decimal |
-| customers | is_male, is_female | Whole Number |
-| transactions | transaction_date | Date |
-| transactions | transaction_amount | Decimal |
-| offer_events | event_date | Date |
+| dim_customers | age_imputed, income_imputed, clv_proxy | Decimal Number |
+| dim_customers | customer_id | Text |
+| dim_customers | engagement_level, rfm_segment, cluster_label | Text |
+| dim_offers | offer_id | Text |
+| dim_offers | channel_email, channel_mobile, channel_social, channel_web | True/False |
+| dim_offers | reward_per_day, difficulty_per_day | Decimal Number |
+| fact_offer_interactions | customer_id, offer_id | Text |
+| fact_offer_interactions | event_date | Date |
+| fact_offer_interactions | time_hours | Decimal Number |
+| fact_kpi_metrics | metric_value | Decimal Number |
+| fact_segment_performance | avg_completion_rate, avg_view_rate | Decimal Number |
+| fact_segment_performance | total_revenue, revenue_per_customer | Decimal Number |
 | dim_date | date | Date |
-| cluster_profiles | value | Decimal |
-| model_performance | value | Decimal |
+| dim_date | date_key | Text |
+| dim_date | is_weekend, is_weekday, is_holiday_period | True/False |
+| dim_date | day_since_start | Whole Number |
+| transactions | transaction_date | Date |
+| transactions | transaction_amount | Decimal Number |
+| offer_events | event_date | Date |
 
-### 4. Star Schema Relationships
-Create these in Model View (drag field between tables):
+### Star Schema Relationships
+Create these in **Model View** (drag field between tables):
 
+**Primary relationships (star schema):**
 | From (Many) | To (One) | Cardinality | Cross-filter |
 |---|---|---|---|
-| customers[customer_id] | transactions[customer_id] | *:1 | Single |
-| customers[customer_id] | offer_events[customer_id] | *:1 | Single |
-| offers[offer_id] | offer_events[offer_id] | *:1 | Single |
-| customers[cluster_id] | cluster_profiles[cluster_id] | *:1 | Single |
-| dim_date[date] | transactions[transaction_date] | *:1 | Single |
-| dim_date[date] | offer_events[event_date] | *:1 | Single |
+| fact_offer_interactions[customer_id] | dim_customers[customer_id] | Many-to-One | Single |
+| fact_offer_interactions[offer_id] | dim_offers[offer_id] | Many-to-One | Single |
+| fact_offer_interactions[event_date_key] | dim_date[date_key] | Many-to-One | Single |
+| transactions[customer_id] | dim_customers[customer_id] | Many-to-One | Single |
+| transactions[transaction_date] | dim_date[date] | Many-to-One | Single |
 
-**Tip**: Mark `dim_date` as the Date Table: right-click → "Mark as Date Table" → Date column.
+**Secondary relationships (supporting tables):**
+| From (Many) | To (One) | Cardinality | Cross-filter |
+|---|---|---|---|
+| offer_events[customer_id] | dim_customers[customer_id] | Many-to-One | Single |
+| offer_events[offer_id] | dim_offers[offer_id] | Many-to-One | Single |
+| offer_events[event_date] | dim_date[date] | Many-to-One | Single |
+
+**Important:**
+- Mark `dim_date` as the **Date Table**: right-click to "Mark as Date Table" to select `date` column
+- Set `date_key` in `dim_date` as the related column for `event_date_key` lookups
+- Ensure cross-filter direction is **Single** (dimension to fact) to preserve star schema filter propagation
 
 ## Visualizations - 4 Dashboard Pages
 
@@ -526,16 +894,17 @@ Create these in Model View (drag field between tables):
 
 | Visual | Fields | Notes |
 |---|---|---|
-| **KPI Card** | Total Customers = COUNT(customers[customer_id]) | Large number format |
-| **KPI Card** | Avg Completion Rate | % format, 1 decimal |
-| **KPI Card** | Avg Transaction | Currency $, 2 decimals |
-| **KPI Card** | Rec System Lift % | Show green if > 0 |
-| **Donut Chart** | Cluster Label (Count) | Starbucks green/gold colors |
-| **Clustered Bar Chart** | Axis: cluster_label, Values: completion_rate, view_rate, avg_transaction | Compare segments side-by-side |
-| **Gauge** | XGBoost AUC-ROC vs target line of 0.70 | Green zone 0.8-1.0 |
-| **Decomposition Tree** | Analyze: Avg Completion Rate, By: cluster_label → engagement_level → gender | Right-click to drill |
+| **KPI Card** | Total Customers (from fact_kpi_metrics where metric_name = "Total Customers") | Large number format |
+| **KPI Card** | Average Completion Rate (from fact_kpi_metrics) | % format, 1 decimal |
+| **KPI Card** | Total Revenue (from fact_kpi_metrics where metric_name = "Total Revenue") | Currency $ |
+| **KPI Card** | Recommendation Lift % (from fact_kpi_metrics) | Show green if > 0 |
+| **KPI Card** | Model AUC-ROC (from fact_kpi_metrics) | Gauge-style, green if > 0.8 |
+| **Donut Chart** | dim_customers[cluster_label] (Count) | Starbucks green/gold colors |
+| **Clustered Bar Chart** | Axis: cluster_label, Values: avg_completion_rate, avg_view_rate, avg_transaction_amount | From fact_segment_performance |
+| **Table** | fact_segment_performance (all columns) | Segment comparison with revenue |
+| **Decomposition Tree** | Analyze: Avg Completion Rate, By: cluster_label to engagement_level to rfm_segment | Drill into segments |
 
-**Slicers** (top ribbon): Cluster label, Engagement level, Offer type
+**Slicers** (top ribbon): cluster_label, engagement_level, offer_type_category
 
 ---
 
@@ -543,12 +912,12 @@ Create these in Model View (drag field between tables):
 
 | Visual | Fields | Notes |
 |---|---|---|
-| **Funnel Chart** | Values: offer_events[event_type] (count) | Stages: received → viewed → completed |
-| **Funnel chart** (per segment) | Copy funnel, add cluster_label filter in Visual-Level Filters | Shows funnel differs by cluster |
-| **Scatter Plot** | X-axis: offers[difficulty], Y-axis: offers[reward], Size: COUNT(offer_events[completed]), Legend: offer_type | Identify sweet-spot offers |
-| **Heatmap (Matrix)** | Rows: offer_type, Columns: channel, Values: AVG(customers[completion_rate]) | Shows which channel×type combo works best |
-| **100% Stacked Bar** | Axis: offer_type, Values: event_type count (%), Legend: event_type | Funnel conversion rate per offer type |
-| **Ribbon Chart** | Axis: event_date, Values: COUNT(offer_events), Legend: event_type | Event volume trends over time |
+| **Funnel Chart** | Values: COUNT(fact_offer_interactions[event_type]) | Stages: received to viewed to completed |
+| **Funnel (per segment)** | Copy funnel, add dim_customers[cluster_label] filter | Shows funnel differs by segment |
+| **Scatter Plot** | X: dim_offers[difficulty], Y: dim_offers[reward], Size: COUNT(completed interactions), Legend: offer_type | Sweet-spot analysis |
+| **Matrix (Heatmap)** | Rows: dim_offers[offer_type], Columns: channel flags, Values: AVG(dim_customers[completion_rate]) | Channel×type combo |
+| **100% Stacked Bar** | Axis: dim_offers[offer_type], Values: event_type count (%), Legend: event_type | Conversion per offer type |
+| **Ribbon Chart** | Axis: dim_date[date], Values: COUNT(fact_offer_interactions), Legend: event_type | Volume trends over time |
 
 ---
 
@@ -556,11 +925,12 @@ Create these in Model View (drag field between tables):
 
 | Visual | Fields | Notes |
 |---|---|---|
-| **Scatter Plot** | X: customers[income], Y: customers[age], Legend: cluster_label | PCA-style view of clusters |
-| **Small Multiples (Line Chart)** | Axis: transaction_date, Values: SUM(transaction_amount), Small multiples: cluster_label | Spend trends per cluster |
-| **Clustered Bar Chart** | Axis: cluster_label, Values: AVG(income), AVG(age), AVG(tenure_months), AVG(transaction_count) | Demographics comparison |
-| **Stacked Column** | Axis: cluster_label, Values: COUNT(customers), Legend: engagement_level | Engagement distribution per cluster |
-| **Key Influencers** | Analyze: customers[cluster_label], Explain by: income, age, completion_rate, view_rate, transaction_count | ML-driven "what drives segment membership" |
+| **Scatter Plot** | X: dim_customers[income_imputed], Y: dim_customers[age_imputed], Legend: cluster_label | Demographic clusters |
+| **Small Multiples (Line)** | Axis: dim_date[date], Values: SUM(transactions[transaction_amount]), Small multiples: cluster_label | Spend trends per segment |
+| **Clustered Bar Chart** | Axis: cluster_label, Values: avg_income, avg_age, avg_transaction_amount | From fact_segment_performance |
+| **Stacked Column** | Axis: cluster_label, Values: COUNT(customers), Legend: engagement_level | Engagement distribution |
+| **Key Influencers** | Analyze: cluster_label, Explain by: income, age, completion_rate, rfm_segment | ML-driven segment drivers |
+| **Scatter with CLV** | X: clv_proxy, Y: completion_rate, Size: total_spend, Legend: rfm_segment | Value vs engagement |
 
 ---
 
@@ -568,101 +938,148 @@ Create these in Model View (drag field between tables):
 
 | Visual | Fields | Notes |
 |---|---|---|
-| **Radar Chart** | (Custom shape) Compare 4 models on AUC-ROC, Precision, Recall, F1 | Use "Shape" or Python visual |
-| **Bar Chart** | Axis: ate_results[offer_type], Values: ate_results[ate_dollars] | Add data label with ± |
+| **Card** | Best model AUC-ROC (from fact_kpi_metrics) | Gauge-style |
+| **Card** | Recommendation Lift % | Green if positive |
+| **Bar Chart** | Axis: offer_type (from ate_results), Values: ate_dollars | Causal impact per type |
 | **Clustered Bar** | Axis: offer_type, Values: control_mean, treatment_mean | Before/after comparison |
-| **Table** | Fields: model_name, metric, value | Matrix style with metric as columns |
-| **Gauge cluster** | One per model: AUC-ROC value vs 0.70 target | Color = green if > 0.8 |
-| **Card** | Rule-Based Targeting lift % (7.9%) | Large, with "+" prefix |
-| **Card** | ATE Any Offer +$0.25 | Currency format |
+| **Table** | fact_segment_performance (cluster_id, cluster_label, segment_size, revenue_per_customer, best_offer_type) | Full segment KPIs |
+| **Gauge** | ATE Any Offer value vs $0 baseline | From fact_kpi_metrics |
+| **Multi-row card** | ATE Bogo, ATE Discount, ATE Informational (from fact_kpi_metrics filter category = "Causal Impact") | Side-by-side impact |
 
 ---
 
 ## DAX Measures
 
-Copy these into the model (Home → New Measure):
+Copy these into the model (Home to New Measure):
 
 ```dax
 -- ============================================
--- CUSTOMER METRICS
+-- STAR SCHEMA MEASURES (using fact/dim tables)
 -- ============================================
 
--- Total customer count (distinct)
-Total Customers = DISTINCTCOUNT(customers[customer_id])
+-- --------------------------------------------
+-- CUSTOMER METRICS (from dim_customers)
+-- --------------------------------------------
 
--- Average completion rate (weighted)
-Avg Completion Rate = AVERAGE(customers[completion_rate])
+Total Customers = DISTINCTCOUNT(dim_customers[customer_id])
 
--- Average view rate
-Avg View Rate = AVERAGE(customers[view_rate])
+Avg Completion Rate = AVERAGE(dim_customers[completion_rate])
 
--- Average transaction value
-Avg Transaction = AVERAGE(customers[avg_transaction])
+Avg View Rate = AVERAGE(dim_customers[view_rate])
 
--- High-engagement customers
+Avg Transaction = AVERAGE(dim_customers[trans_avg])
+
 High Engagement Customers =
     CALCULATE(
-        DISTINCTCOUNT(customers[customer_id]),
-        customers[completion_rate] >= 0.5
+        DISTINCTCOUNT(dim_customers[customer_id]),
+        dim_customers[engagement_level] = "High"
     )
 
--- ============================================
--- OFFER FUNNEL
--- ============================================
+-- --------------------------------------------
+-- OFFER FUNNEL (from fact_offer_interactions)
+-- --------------------------------------------
 
--- Total offers received
-Offers Received = COUNTROWS(FILTER(offer_events, offer_events[event_type] = "offer received"))
+Offers Received = COUNTROWS(
+    FILTER(fact_offer_interactions, fact_offer_interactions[event_type] = "received")
+)
 
--- Offers viewed
-Offers Viewed = COUNTROWS(FILTER(offer_events, offer_events[event_type] = "offer viewed"))
+Offers Viewed = COUNTROWS(
+    FILTER(fact_offer_interactions, fact_offer_interactions[event_type] = "viewed")
+)
 
--- Offers completed
-Offers Completed = COUNTROWS(FILTER(offer_events, offer_events[event_type] = "offer completed"))
+Offers Completed = COUNTROWS(
+    FILTER(fact_offer_interactions, fact_offer_interactions[event_type] = "completed")
+)
 
--- Funnel conversion: received → viewed
-Received to Viewed % =
-    DIVIDE([Offers Viewed], [Offers Received])
+View Rate % = DIVIDE([Offers Viewed], [Offers Received])
 
--- Funnel conversion: received → completed
-Received to Completed % =
-    DIVIDE([Offers Completed], [Offers Received])
+Completion Rate % = DIVIDE([Offers Completed], [Offers Received])
 
--- ============================================
--- TIME INTELLIGENCE (requires dim_date marked as date table)
--- ============================================
+-- Funnel by offer type (cross-filtered from dim_offers)
+BOGO Offers Received = CALCULATE([Offers Received], dim_offers[offer_type] = "bogo")
+Discount Offers Received = CALCULATE([Offers Received], dim_offers[offer_type] = "discount")
+Info Offers Received = CALCULATE([Offers Received], dim_offers[offer_type] = "informational")
 
--- Running total spend
+-- --------------------------------------------
+-- FINANCIAL METRICS (from fact_kpi_metrics)
+-- --------------------------------------------
+
+KPI Total Customers = CALCULATE(
+    SUM(fact_kpi_metrics[metric_value]),
+    fact_kpi_metrics[metric_name] = "Total Customers"
+)
+
+KPI Total Revenue = CALCULATE(
+    SUM(fact_kpi_metrics[metric_value]),
+    fact_kpi_metrics[metric_name] = "Total Revenue"
+)
+
+KPI Avg Completion Rate = CALCULATE(
+    SUM(fact_kpi_metrics[metric_value]),
+    fact_kpi_metrics[metric_name] = "Average Completion Rate"
+)
+
+KPI Recommendation Lift = CALCULATE(
+    SUM(fact_kpi_metrics[metric_value]),
+    fact_kpi_metrics[metric_name] = "Recommendation Lift %"
+)
+
+KPI Model AUC = CALCULATE(
+    SUM(fact_kpi_metrics[metric_value]),
+    fact_kpi_metrics[metric_name] = "Model AUC-ROC"
+)
+
+-- --------------------------------------------
+-- SEGMENT METRICS (from fact_segment_performance)
+-- --------------------------------------------
+
+Segment Revenue Rank = RANKX(
+    ALL(fact_segment_performance),
+    CALCULATE(SUM(fact_segment_performance[total_revenue])),
+    ,DESC
+)
+
+Best Segment = MINX(
+    TOPN(1, fact_segment_performance, fact_segment_performance[total_revenue], DESC),
+    fact_segment_performance[cluster_label]
+)
+
+-- --------------------------------------------
+-- TIME INTELLIGENCE (requires dim_date as date table)
+-- --------------------------------------------
+
 Running Total Spend =
     CALCULATE(
         SUM(transactions[transaction_amount]),
         DATESYTD(dim_date[date])
     )
 
--- Spend vs previous period
-Spend vs Previous Period =
+Interactions Last N Days =
     CALCULATE(
-        SUM(transactions[transaction_amount]),
-        SAMEPERIODLASTYEAR(dim_date[date])
+        COUNTROWS(fact_offer_interactions),
+        FILTER(
+            ALL(dim_date),
+            dim_date[day_since_start] <= MAX(dim_date[day_since_start])
+                && dim_date[day_since_start] >= MAX(dim_date[day_since_start]) - 7
+        )
     )
 
--- Transaction count MTD
-Transactions MTD =
-    TOTALMTD(
-        COUNTROWS(transactions),
-        dim_date[date]
+-- Interactions during holiday period
+Holiday Period Interactions =
+    CALCULATE(
+        COUNTROWS(fact_offer_interactions),
+        dim_date[is_holiday_period] = TRUE()
     )
 
--- ============================================
--- MODEL PERFORMANCE
--- ============================================
+-- --------------------------------------------
+-- MODEL PERFORMANCE (legacy table)
+-- --------------------------------------------
 
--- Best model AUC-ROC
 Best AUC-ROC = MAXX(
     FILTER(model_performance, model_performance[metric] = "AUC-ROC"),
     model_performance[value]
 )
 
--- Best model name
 Best Model = MINX(
     TOPN(1,
         FILTER(model_performance, model_performance[metric] = "AUC-ROC"),
@@ -671,24 +1088,13 @@ Best Model = MINX(
     model_performance[model_name]
 )
 
--- ============================================
--- BUSINESS IMPACT
--- ============================================
+-- --------------------------------------------
+-- DYNAMIC MEASURES (disconnected table for switching)
+-- --------------------------------------------
 
--- Lift from rule-based targeting (percentage)
-Lift % = SUM(recommendation_results[lift_percent])
-
--- Lift from rule-based targeting (points)
-Lift Points =
-    MAXX(recommendation_results, recommendation_results[completion_rate]) -
-    MINX(recommendation_results, recommendation_results[completion_rate])
-
--- ============================================
--- DYNAMIC MEASURES (for parameter-style switching)
--- ============================================
-
--- Create a disconnected table for measure selection (in Power BI: Home > Enter Data):
---   Table name: param_metrics, Column: Metric (string), Rows: "Completion Rate", "View Rate", "Avg Spend", "Transaction Count"
+-- Create a disconnected table (Home > Enter Data):
+--   Table: param_metrics, Column: Metric
+--   Rows: "Completion Rate", "View Rate", "Avg Spend", "Transaction Count"
 
 Selected KPI =
     SWITCH(
@@ -696,7 +1102,7 @@ Selected KPI =
         "Completion Rate", [Avg Completion Rate],
         "View Rate", [Avg View Rate],
         "Avg Spend", [Avg Transaction],
-        "Transaction Count", COUNTROWS(transactions),
+        "Transaction Count", COUNTROWS(fact_offer_interactions),
         [Avg Completion Rate]
     )
 
@@ -704,15 +1110,15 @@ Selected KPI =
 Report Title =
     "Starbucks Segments" &
         IF(
-            HASONEVALUE(customers[cluster_label]),
-            " - " & VALUES(customers[cluster_label]),
+            HASONEVALUE(dim_customers[cluster_label]),
+            " - " & VALUES(dim_customers[cluster_label]),
             ""
         )
 ```
 
 ## Starbucks Theme Setup
 
-1. **View tab** → **Themes** → **Customize current theme**
+1. **View tab** to **Themes** to **Customize current theme**
 2. Set colors:
    - **Data colors**: `#00704A` (green primary), `#6B8E23` (olive), `#FFC72C` (gold), `#1E3932` (dark green), `#D4E9E2` (light mint)
    - **Background**: White `#FFFFFF`
@@ -722,23 +1128,24 @@ Report Title =
 
 ## Layout & Interactivity Tips
 
-- **Slicer panel**: Add a consistent left-rail with slicers for cluster_label, engagement_level, offer_type. Sync across all 4 pages via "View → Sync Slicers"
+- **Slicer panel**: Add a consistent left-rail with slicers for cluster_label, engagement_level, offer_type_category. Sync across all 4 pages via "View to Sync Slicers"
 - **Page navigation**: Insert shape buttons (rounded rectangle) at the top of each page, assign Page Navigation action
-- **Drill-through**: Right-click page tab → "Drill-through" → add cluster_label as drill-through field. Any page can now right-click → drill to details
+- **Drill-through**: Right-click page tab to "Drill-through" to add cluster_label as drill-through field. Any page can right-click to drill to details
 - **Tooltip pages**: Create a mini page (200x300) with cluster profile metrics. Assign it as the tooltip for cluster visuals
-- **Mobile layout**: View → Mobile Layout → arrange cards vertically for phone viewing
+- **Mobile layout**: View to Mobile Layout to arrange cards vertically for phone viewing
+- **KPI cards**: Use the fact_kpi_metrics table with visual-level filters on metric_name for quick card visuals
 
 ## Next Steps
 
 1. Run `python src/reporting/export_powerbi.py` to regenerate CSVs with latest data
-2. Open Power BI Desktop → Get Data → Folder → select `{export_dir}`
-3. Set data types per the table above
-4. Create relationships per the star schema above
-5. Mark dim_date as date table
+2. Open Power BI Desktop to Get Data to Folder to select `{export_dir}`
+3. Set data types per the Power Query table above
+4. Create relationships per the star schema diagram above
+5. Mark `dim_date` as date table (right-click to "Mark as Date Table" to date column)
 6. Paste DAX measures from this guide
 7. Build the 4 dashboard pages following the visual tables above
 8. Apply the Starbucks theme
-9. Publish to Power BI Service → Share on portfolio!
+9. Publish to Power BI Service to Share on portfolio!
 
 ---
 
@@ -750,7 +1157,7 @@ Report Title =
 
     with open(export_dir / 'POWERBI_INSTRUCTIONS.md', 'w') as f:
         f.write(instructions)
-    
+
     print(f"\n Power BI instructions saved to: {export_dir / 'POWERBI_INSTRUCTIONS.md'}")
 
 
@@ -758,13 +1165,11 @@ if __name__ == "__main__":
     print("="*60)
     print("STARBUCKS CUSTOMER SEGMENTATION - POWER BI EXPORT")
     print("="*60)
-    
-    # Export all datasets
+
     export_dir, datasets = save_all_exports()
-    
-    # Create instructions with dynamic data
+
     create_powerbi_instructions(export_dir, datasets)
-    
+
     print("\n" + "="*60)
     print("POWER BI EXPORT COMPLETE")
     print("="*60)
@@ -775,6 +1180,7 @@ if __name__ == "__main__":
     print("\n Next steps:")
     print("  1. Open Power BI Desktop")
     print("  2. Import CSV files from 'powerbi_data/' folder")
-    print("  3. Create relationships between tables")
-    print("  4. Build interactive dashboards")
-    print("  5. Share on your portfolio with screenshots!")
+    print("  3. Create star schema relationships (see POWERBI_INSTRUCTIONS.md)")
+    print("  4. Mark dim_date as date table")
+    print("  5. Build interactive dashboards")
+    print("  6. Share on your portfolio with screenshots!")

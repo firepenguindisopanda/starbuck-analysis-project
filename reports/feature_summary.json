@@ -1,7 +1,7 @@
 {
   "customer_features": {
     "count": 17000,
-    "feature_count": 43,
+    "feature_count": 55,
     "features": [
       "age",
       "age_missing",
@@ -45,7 +45,19 @@
       "bogo_completion_rate",
       "discount_view_rate",
       "discount_completion_rate",
-      "info_view_rate"
+      "info_view_rate",
+      "recency_days",
+      "frequency",
+      "monetary",
+      "rfm_score",
+      "spend_last_7d",
+      "spend_last_14d",
+      "spend_trend",
+      "offer_recency_days",
+      "avg_time_to_view",
+      "avg_time_to_complete",
+      "clv_proxy",
+      "total_channels_used"
     ]
   },
   "offer_features": {
@@ -68,10 +80,56 @@
   },
   "interaction_features": {
     "count": 174583,
-    "feature_count": 59,
+    "feature_count": 75,
     "target_distribution": {
       "0": 141004,
       "1": 33579
     }
+  },
+  "rfm_features": {
+    "count": 17000,
+    "feature_count": 4,
+    "features": [
+      "recency_days",
+      "frequency",
+      "monetary",
+      "rfm_score"
+    ]
+  },
+  "time_decay_features": {
+    "count": 17000,
+    "feature_count": 4,
+    "features": [
+      "spend_last_7d",
+      "spend_last_14d",
+      "spend_trend",
+      "offer_recency_days"
+    ]
+  },
+  "channel_customer_features": {
+    "count": 16994,
+    "feature_count": 1,
+    "features": [
+      "total_channels_used"
+    ]
+  },
+  "channel_interaction_features": {
+    "count": 49135,
+    "feature_count": 5,
+    "features": [
+      "viewed_via_email",
+      "viewed_via_mobile",
+      "viewed_via_social",
+      "viewed_via_web",
+      "total_channels_used"
+    ]
+  },
+  "offer_timing_features": {
+    "count": 17000,
+    "feature_count": 2,
+    "features": [
+      "avg_time_to_view",
+      "avg_time_to_complete"
+    ]
   }
 }

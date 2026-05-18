@@ -151,5 +151,211 @@
   "transaction_analysis": {
     "responder_count": 12774,
     "total_customers_with_transactions": 16578
-  }
+  },
+  "hypothesis_testing": {
+    "mann_whitney": {
+      "u_statistic": 2006185627.0,
+      "p_value": 0.0,
+      "cohens_d": 0.35686376221073474,
+      "significant": "True",
+      "responder_mean": 14.378468412056389,
+      "non_responder_mean": 3.669474368231047
+    },
+    "chi_squared": {
+      "chi2_statistic": 351.4243784845592,
+      "p_value": 4.888389571490664e-77,
+      "dof": 2,
+      "cramers_v": 0.15396378945839337,
+      "significant": "True"
+    },
+    "kruskal_wallis": {
+      "h_statistic": 38.66570254990474,
+      "p_value": 5.029698578217201e-10,
+      "significant": "True"
+    },
+    "two_proportion_z": {
+      "z_statistic": -18.035670897870606,
+      "p_value": 0.0,
+      "bogo_rate": 0.5137545493294862,
+      "discount_rate": 0.5863864060504862,
+      "significant": true
+    }
+  },
+  "effect_sizes": {
+    "effect_sizes": [
+      {
+        "metric": "trans_count",
+        "label": "Transaction Count",
+        "cohens_d": 0.797963489778223,
+        "magnitude": "medium"
+      },
+      {
+        "metric": "trans_avg",
+        "label": "Avg Transaction Amount",
+        "cohens_d": 0.7826583550978433,
+        "magnitude": "medium"
+      },
+      {
+        "metric": "trans_total",
+        "label": "Total Spend",
+        "cohens_d": 0.9645892426278597,
+        "magnitude": "large"
+      },
+      {
+        "metric": "age_clean",
+        "label": "Age",
+        "cohens_d": 0.31075227488047236,
+        "magnitude": "small"
+      },
+      {
+        "metric": "income",
+        "label": "Income",
+        "cohens_d": 0.7267003415716998,
+        "magnitude": "medium"
+      }
+    ]
+  },
+  "confidence_intervals": {
+    "completion_rate_bogo": {
+      "rate": 0.5137545493294862,
+      "ci_lower": 0.6099919957310566,
+      "ci_upper": 0.6256003201707577
+    },
+    "completion_rate_discount": {
+      "rate": 0.5863864060504862,
+      "ci_lower": 0.6810287721646036,
+      "ci_upper": 0.6960187353629976
+    },
+    "completion_rate_informational": {
+      "rate": 0.0,
+      "ci_lower": 0.0,
+      "ci_upper": 0.0
+    },
+    "responder_mean_amount": {
+      "mean": 14.378468412056389,
+      "ci_lower": 14.196634682428202,
+      "ci_upper": 14.560731925569904
+    },
+    "non_responder_mean_amount": {
+      "mean": 3.669474368231047,
+      "ci_lower": 3.5061428760529485,
+      "ci_upper": 3.86227880866426
+    }
+  },
+  "correlation_analysis": {
+    "pearson_completion_rate": {
+      "difficulty": 0.5302029207535268,
+      "reward": 0.3877269082524713,
+      "duration": 0.7012744898125988,
+      "completion_rate": 1.0,
+      "view_rate": 0.2358505273995828
+    },
+    "spearman_completion_rate": {
+      "difficulty": 0.2462050562005353,
+      "reward": 0.1490942086411279,
+      "duration": 0.6186691155808323,
+      "completion_rate": 1.0,
+      "view_rate": 0.3586642707712381
+    }
+  },
+  "cohort_analysis": [
+    {
+      "join_year": 2013,
+      "n_customers": 286,
+      "total_received": 1286.0,
+      "total_completed": 568.0,
+      "total_viewed": 963.0,
+      "completion_rate": 0.4416796267496112,
+      "view_rate": 0.7488335925349923,
+      "avg_completed_per_person": 1.986013986013986
+    },
+    {
+      "join_year": 2014,
+      "n_customers": 691,
+      "total_received": 3107.0,
+      "total_completed": 1334.0,
+      "total_viewed": 2377.0,
+      "completion_rate": 0.4293530737045381,
+      "view_rate": 0.7650466688123592,
+      "avg_completed_per_person": 1.930535455861071
+    },
+    {
+      "join_year": 2015,
+      "n_customers": 1830,
+      "total_received": 8209.0,
+      "total_completed": 4489.0,
+      "total_viewed": 6194.0,
+      "completion_rate": 0.546838835424534,
+      "view_rate": 0.7545377025216226,
+      "avg_completed_per_person": 2.4530054644808743
+    },
+    {
+      "join_year": 2016,
+      "n_customers": 3526,
+      "total_received": 15759.0,
+      "total_completed": 9298.0,
+      "total_viewed": 12070.0,
+      "completion_rate": 0.5900120566025763,
+      "view_rate": 0.7659115426105717,
+      "avg_completed_per_person": 2.6369824163357913
+    },
+    {
+      "join_year": 2017,
+      "n_customers": 6469,
+      "total_received": 28999.0,
+      "total_completed": 12595.0,
+      "total_viewed": 21925.0,
+      "completion_rate": 0.4343253215628125,
+      "view_rate": 0.7560605538122004,
+      "avg_completed_per_person": 1.9469778945741227
+    },
+    {
+      "join_year": 2018,
+      "n_customers": 4198,
+      "total_received": 18917.0,
+      "total_completed": 5295.0,
+      "total_viewed": 14196.0,
+      "completion_rate": 0.27990696199185916,
+      "view_rate": 0.7504361156631602,
+      "avg_completed_per_person": 1.2613149118627918
+    }
+  ],
+  "channel_effectiveness": [
+    {
+      "channel": "email",
+      "view_rate_with": 0.7567812053436815,
+      "view_rate_without": NaN,
+      "completion_rate_with": 0.4402244451145168,
+      "completion_rate_without": NaN,
+      "n_received_with": 76277,
+      "n_received_without": 0
+    },
+    {
+      "channel": "mobile",
+      "view_rate_with": 0.802547770700637,
+      "view_rate_without": 0.34728742827334375,
+      "completion_rate_with": 0.4395778979434185,
+      "completion_rate_without": 0.4460093896713615,
+      "n_received_with": 68609,
+      "n_received_without": 7668
+    },
+    {
+      "channel": "social",
+      "view_rate_with": 0.9331479981612416,
+      "view_rate_without": 0.4934300843302608,
+      "completion_rate_with": 0.4769389050631526,
+      "completion_rate_without": 0.38540236647708703,
+      "n_received_with": 45683,
+      "n_received_without": 30594
+    },
+    {
+      "channel": "web",
+      "view_rate_with": 0.7265782528155276,
+      "view_rate_without": 0.87738936894475,
+      "completion_rate_with": 0.49000836051868,
+      "completion_rate_without": 0.2414244566640482,
+      "n_received_with": 61001,
+      "n_received_without": 15276
+    }
+  ]
 }

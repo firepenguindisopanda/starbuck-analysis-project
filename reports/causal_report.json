@@ -59,5 +59,272 @@
     "random_completion_rate": 0.43544017944844365,
     "rule_based_completion_rate": 0.4698892156862745,
     "lift_percent": 7.911313163949685
+  },
+  "bootstrap_confidence_intervals": {
+    "any_offer": {
+      "ci_lower": -4.08238472330188,
+      "ci_upper": 4.174195210641099,
+      "ci_includes_zero": true,
+      "significant": false,
+      "bootstrap_mean": 0.30938331242397415,
+      "bootstrap_std": 2.1281745210271112,
+      "n_bootstrap": 1000,
+      "confidence_level": 0.95
+    },
+    "bogo": {
+      "ci_lower": -0.26651761350002834,
+      "ci_upper": 0.6995389890709834,
+      "ci_includes_zero": true,
+      "significant": false,
+      "bootstrap_mean": 0.2393500600478893,
+      "bootstrap_std": 0.24832813528872927,
+      "n_bootstrap": 1000,
+      "confidence_level": 0.95
+    },
+    "discount": {
+      "ci_lower": -0.8163580808786806,
+      "ci_upper": 0.2732000692076253,
+      "ci_includes_zero": true,
+      "significant": false,
+      "bootstrap_mean": -0.25513481983720987,
+      "bootstrap_std": 0.27443562545961053,
+      "n_bootstrap": 1000,
+      "confidence_level": 0.95
+    },
+    "informational": {
+      "ci_lower": -0.35673728838706364,
+      "ci_upper": 0.32896605806115997,
+      "ci_includes_zero": true,
+      "significant": false,
+      "bootstrap_mean": -0.003963937232397228,
+      "bootstrap_std": 0.1692971819341497,
+      "n_bootstrap": 1000,
+      "confidence_level": 0.95
+    }
+  },
+  "statistical_significance": {
+    "any_offer": {
+      "t_statistic": 0.11519952123305165,
+      "p_value": 0.9094923104491319,
+      "degrees_freedom": 138951,
+      "cohens_d": 0.008161536883443638,
+      "effect_size_label": "negligible",
+      "significant": false,
+      "control_n": 20,
+      "treatment_n": 138933,
+      "control_mean": 12.5305,
+      "treatment_mean": 12.777391692398494
+    },
+    "bogo": {
+      "t_statistic": 0.9657059618109801,
+      "p_value": 0.33420308965526935,
+      "degrees_freedom": 138951,
+      "cohens_d": 0.007808921641084683,
+      "effect_size_label": "negligible",
+      "significant": false,
+      "control_n": 15231,
+      "treatment_n": 123722,
+      "control_mean": 12.567025146083644,
+      "treatment_mean": 12.803249300851911
+    },
+    "discount": {
+      "t_statistic": -0.9142671615736413,
+      "p_value": 0.3605883654089365,
+      "degrees_freedom": 138951,
+      "cohens_d": -0.008213391323344468,
+      "effect_size_label": "negligible",
+      "significant": false,
+      "control_n": 15086,
+      "treatment_n": 123867,
+      "control_mean": 12.998840646957445,
+      "treatment_mean": 12.750381134604051
+    },
+    "informational": {
+      "t_statistic": 0.00770545638725336,
+      "p_value": 0.9938520098663234,
+      "degrees_freedom": 138951,
+      "cohens_d": 4.277230642143361e-05,
+      "effect_size_label": "negligible",
+      "significant": false,
+      "control_n": 54333,
+      "treatment_n": 84620,
+      "control_mean": 12.776568199804908,
+      "treatment_mean": 12.77786208934058
+    }
+  },
+  "propensity_score_matching": {},
+  "heterogeneous_effects": {
+    "0": {
+      "n_customers": 2170,
+      "offer_ates": {
+        "bogo": {
+          "ate": 0.03668585737992336,
+          "ate_percent": 1.3464237896077198,
+          "treatment_mean": 2.7613745967709415,
+          "control_mean": 2.724688739391018,
+          "treatment_n": 1907,
+          "control_n": 263
+        },
+        "discount": {
+          "ate": -0.01078476410251783,
+          "ate_percent": -0.3898543904581366,
+          "treatment_mean": 2.7555722056994987,
+          "control_mean": 2.7663569698020165,
+          "treatment_n": 1898,
+          "control_n": 272
+        },
+        "informational": {
+          "ate": 0.1321682086802647,
+          "ate_percent": 4.941600850059197,
+          "treatment_mean": 2.8067712915796332,
+          "control_mean": 2.6746030828993685,
+          "treatment_n": 1346,
+          "control_n": 824
+        }
+      },
+      "best_offer": "informational",
+      "best_ate": 0.1321682086802647
+    },
+    "1": {
+      "n_customers": 4228,
+      "offer_ates": {
+        "bogo": {
+          "ate": -1.5284312213928253,
+          "ate_percent": -8.25644588110426,
+          "treatment_mean": 16.983544069219814,
+          "control_mean": 18.51197529061264,
+          "treatment_n": 3299,
+          "control_n": 929
+        },
+        "discount": {
+          "ate": null,
+          "ate_percent": null,
+          "treatment_n": 4228,
+          "control_n": 0
+        },
+        "informational": {
+          "ate": 0.06031998940248684,
+          "ate_percent": 0.34897051245647476,
+          "treatment_mean": 17.345445021280426,
+          "control_mean": 17.28512503187794,
+          "treatment_n": 2401,
+          "control_n": 1827
+        }
+      },
+      "best_offer": "informational",
+      "best_ate": 0.06031998940248684
+    },
+    "2": {
+      "n_customers": 4837,
+      "offer_ates": {
+        "bogo": {
+          "ate": null,
+          "ate_percent": null,
+          "treatment_n": 4835,
+          "control_n": 2
+        },
+        "discount": {
+          "ate": -0.5349903800219806,
+          "ate_percent": -2.4152903256710023,
+          "treatment_mean": 21.615157547778487,
+          "control_mean": 22.150147927800468,
+          "treatment_n": 4050,
+          "control_n": 787
+        },
+        "informational": {
+          "ate": 1.301377142760785,
+          "ate_percent": 6.21654941735382,
+          "treatment_mean": 22.235452550058653,
+          "control_mean": 20.93407540729787,
+          "treatment_n": 2855,
+          "control_n": 1982
+        }
+      },
+      "best_offer": "informational",
+      "best_ate": 1.301377142760785
+    },
+    "3": {
+      "n_customers": 5765,
+      "offer_ates": {
+        "bogo": {
+          "ate": -2.902243274507022,
+          "ate_percent": -27.956822599917707,
+          "treatment_mean": 7.4789195494669904,
+          "control_mean": 10.381162823974012,
+          "treatment_n": 4951,
+          "control_n": 814
+        },
+        "discount": {
+          "ate": -2.7374836871046107,
+          "ate_percent": -26.99844980708532,
+          "treatment_mean": 7.401926933375538,
+          "control_mean": 10.139410620480149,
+          "treatment_n": 4769,
+          "control_n": 996
+        },
+        "informational": {
+          "ate": 2.338849596581814,
+          "ate_percent": 37.27476955614631,
+          "treatment_mean": 8.613468123891144,
+          "control_mean": 6.27461852730933,
+          "treatment_n": 3945,
+          "control_n": 1820
+        }
+      },
+      "best_offer": "informational",
+      "best_ate": 2.338849596581814
+    }
+  },
+  "ab_test_simulation": {
+    "baseline_rate": 0.43544017944844365,
+    "treatment_rate": 0.4698892156862745,
+    "absolute_lift": 0.034449036237830855,
+    "lift_percent": 7.911313163949685,
+    "effect_size_cohens_h": 0.0692089137793694,
+    "required_sample_per_group": 3277,
+    "required_sample_total": 6554,
+    "feasible": true,
+    "power_analysis": [
+      {
+        "n_per_group": 500,
+        "total_n": 1000,
+        "power": 0.199
+      },
+      {
+        "n_per_group": 1000,
+        "total_n": 2000,
+        "power": 0.392
+      },
+      {
+        "n_per_group": 2000,
+        "total_n": 4000,
+        "power": 0.59
+      },
+      {
+        "n_per_group": 3277,
+        "total_n": 6554,
+        "power": 0.794
+      },
+      {
+        "n_per_group": 5000,
+        "total_n": 10000,
+        "power": 0.938
+      },
+      {
+        "n_per_group": 10000,
+        "total_n": 20000,
+        "power": 1.0
+      }
+    ],
+    "simulation": {
+      "n_simulations": 1000,
+      "sample_per_group": 3277,
+      "mean_lift": 0.03439395788831248,
+      "lift_ci_lower": 0.011283185840707978,
+      "lift_ci_upper": 0.05797985962770824,
+      "empirical_power": 0.796,
+      "alpha": 0.05,
+      "power_target": 0.8
+    }
   }
 }

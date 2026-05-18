@@ -2,82 +2,82 @@
   "best_model": {
     "name": "XGBoost",
     "metrics": {
-      "auc_roc": 0.9087242200700878,
-      "precision": 0.6332630098452883,
-      "recall": 0.5363311494937463,
-      "f1": 0.5807803934214769
+      "auc_roc": 0.9936141377606288,
+      "precision": 0.8467668190725016,
+      "recall": 0.9651578320428826,
+      "f1": 0.9020944958597175
     }
   },
   "model_comparison": [
     {
       "Model": "XGBoost",
-      "AUC-ROC": 0.9087242200700878,
-      "Precision": 0.6332630098452883,
-      "Recall": 0.5363311494937463,
-      "F1-Score": 0.5807803934214769
+      "AUC-ROC": 0.9936141377606288,
+      "Precision": 0.8467668190725016,
+      "Recall": 0.9651578320428826,
+      "F1-Score": 0.9020944958597175
     },
     {
       "Model": "Gradient Boosting",
-      "AUC-ROC": 0.9079075056982147,
-      "Precision": 0.6531504671039555,
-      "Recall": 0.48927933293627157,
-      "F1-Score": 0.5594619902953946
+      "AUC-ROC": 0.9921026876557606,
+      "Precision": 0.9140285536933581,
+      "Recall": 0.8770101250744491,
+      "F1-Score": 0.8951367781155015
     },
     {
       "Model": "Random Forest",
-      "AUC-ROC": 0.889228934282466,
-      "Precision": 0.5802796955213312,
-      "Recall": 0.48808814770696846,
-      "F1-Score": 0.530206227254347
+      "AUC-ROC": 0.9919706719476258,
+      "Precision": 0.9040181956027293,
+      "Recall": 0.8877307921381775,
+      "F1-Score": 0.8958004657801818
     },
     {
       "Model": "Baseline",
-      "AUC-ROC": 0.8392845462988093,
-      "Precision": 0.5218242865137102,
-      "Recall": 0.2776950565812984,
-      "F1-Score": 0.3624878522837707
+      "AUC-ROC": 0.9785763112620522,
+      "Precision": 0.8842832469775475,
+      "Recall": 0.8385944014294223,
+      "F1-Score": 0.8608330149025601
     }
   ],
   "top_10_features": [
     {
+      "feature": "viewed_via_email",
+      "importance": 0.4447171092033386
+    },
+    {
       "feature": "offers_completed",
-      "importance": 0.3546605706214905
+      "importance": 0.14881061017513275
+    },
+    {
+      "feature": "view_to_completion_rate",
+      "importance": 0.06848295778036118
     },
     {
       "feature": "reward",
-      "importance": 0.12463261932134628
+      "importance": 0.041588831692934036
     },
     {
       "feature": "offer_type_bogo",
-      "importance": 0.11402551084756851
+      "importance": 0.03539387136697769
+    },
+    {
+      "feature": "duration",
+      "importance": 0.02800571359694004
     },
     {
       "feature": "bogo_completed",
-      "importance": 0.09108054637908936
+      "importance": 0.021632377058267593
     },
     {
-      "feature": "discount_completed",
-      "importance": 0.053988367319107056
+      "feature": "view_rate",
+      "importance": 0.02075749635696411
     },
     {
-      "feature": "discount_viewed",
-      "importance": 0.023347802460193634
+      "feature": "channel_social",
+      "importance": 0.020382286980748177
     },
     {
-      "feature": "difficulty_x_reward",
-      "importance": 0.01964695379137993
-    },
-    {
-      "feature": "bogo_viewed",
-      "importance": 0.018455663695931435
-    },
-    {
-      "feature": "difficulty",
-      "importance": 0.016211919486522675
-    },
-    {
-      "feature": "discount_view_rate",
-      "importance": 0.01419069617986679
+      "feature": "completion_rate",
+      "importance": 0.016420306637883186
     }
   ]
 }

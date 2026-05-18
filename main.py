@@ -1,8 +1,8 @@
 """
 Starbucks Customer Segmentation & Offer Recommendation - Pipeline Entry Point.
 
-Runs the full end-to-end pipeline: data ingestion → EDA → feature engineering
-→ clustering → predictive modeling → recommendation → reports.
+Runs the full end-to-end pipeline: data ingestion to EDA to feature engineering
+to clustering to predictive modeling to recommendation to reports.
 """
 
 import sys

@@ -4,7 +4,12 @@
   "optimization": {
     "silhouette_score": 0.14737977921637996,
     "calinski_score": 2436.1369921358837,
-    "wcss": 380417.68725960254
+    "davies_bouldin_score": 2.2020851183859262,
+    "wcss": 380417.6872596025,
+    "optimal_k_silhouette": 3,
+    "optimal_k_elbow": 3,
+    "optimal_k_db": 5,
+    "optimal_k_gap": 2
   },
   "cluster_profiles": [
     {
@@ -143,5 +148,189 @@
       "gender_O_pct": 0.01196877710320902,
       "gender_Unknown_pct": 0.0
     }
-  ]
+  ],
+  "stability": {
+    "mean_ari": 0.756186193346558,
+    "std_ari": 0.19443097712844792,
+    "min_ari": 0.5960013604832268,
+    "interpretation": "Moderately stable - most clusters are consistent"
+  },
+  "business_metrics": [
+    {
+      "cluster_id": 0,
+      "size": 2170,
+      "pct_of_total": 0.12764705882352942,
+      "revenue_per_customer": 18.534728110599076,
+      "total_reward_cost_per_customer": 0.0,
+      "offer_roi": 999.0,
+      "avg_view_rate": 0.8064900153609831,
+      "avg_completion_rate": 0.11387864823348695,
+      "avg_trans_count": 6.873271889400922,
+      "churn_risk_proxy": 0
+    },
+    {
+      "cluster_id": 1,
+      "size": 4228,
+      "pct_of_total": 0.24870588235294117,
+      "revenue_per_customer": 152.49801324503312,
+      "total_reward_cost_per_customer": 0.0,
+      "offer_roi": 999.0,
+      "avg_view_rate": 0.7811376537369915,
+      "avg_completion_rate": 0.697165720592873,
+      "avg_trans_count": 10.266792809839167,
+      "churn_risk_proxy": 0
+    },
+    {
+      "cluster_id": 2,
+      "size": 4837,
+      "pct_of_total": 0.28452941176470586,
+      "revenue_per_customer": 180.8049886293157,
+      "total_reward_cost_per_customer": 0.0,
+      "offer_roi": 999.0,
+      "avg_view_rate": 0.8242126662531872,
+      "avg_completion_rate": 0.7085521328647233,
+      "avg_trans_count": 9.4103783336779,
+      "churn_risk_proxy": 0
+    },
+    {
+      "cluster_id": 3,
+      "size": 5765,
+      "pct_of_total": 0.3391176470588235,
+      "revenue_per_customer": 37.4529540329575,
+      "total_reward_cost_per_customer": 0.0,
+      "offer_roi": 999.0,
+      "avg_view_rate": 0.673460537727667,
+      "avg_completion_rate": 0.14823070251517778,
+      "avg_trans_count": 6.090546400693842,
+      "churn_risk_proxy": 0
+    }
+  ],
+  "segment_narratives": {
+    "cluster_0": {
+      "cluster_id": 0,
+      "segment_name": "Low-Engagement Customers",
+      "segment_type": "low_engagement",
+      "size": 2170,
+      "pct_of_total": 0.12764705882352942,
+      "description": "Customers with low view and completion rates, low spending, and minimal offer interaction. Highest churn risk.",
+      "key_characteristics": {
+        "age": 55.0,
+        "income": 64000.0,
+        "tenure_months": 15.863737381689141,
+        "avg_spend": 18.534728110599076,
+        "avg_transaction": 2.6438428635775155,
+        "view_rate": 0.8064900153609831,
+        "completion_rate": 0.11387864823348695,
+        "bogo_completion_rate": 0.09326420890937019,
+        "discount_completion_rate": 0.15775729646697387
+      },
+      "business_metrics": {
+        "revenue_per_customer": 18.534728110599076,
+        "offer_roi": 999.0,
+        "churn_risk_proxy": 0.0
+      },
+      "recommendations": [
+        "Deploy re-engagement campaigns with simpler offers",
+        "Send push notifications to increase view rates",
+        "Reduce offer complexity - focus on single-step completion",
+        "Consider win-back offers with expiration urgency"
+      ]
+    },
+    "cluster_1": {
+      "cluster_id": 1,
+      "segment_name": "High-Value Loyalists",
+      "segment_type": "high_value_loyalist",
+      "size": 4228,
+      "pct_of_total": 0.24870588235294117,
+      "description": "Premium customers with high spending, strong offer engagement, and long tenure. These are your brand advocates.",
+      "key_characteristics": {
+        "age": 55.60312204351939,
+        "income": 68345.3169347209,
+        "tenure_months": 20.376149802890932,
+        "avg_spend": 152.49801324503312,
+        "avg_transaction": 17.319379595396242,
+        "view_rate": 0.7811376537369915,
+        "completion_rate": 0.697165720592873,
+        "bogo_completion_rate": 0.559957426679281,
+        "discount_completion_rate": 0.8924314096499526
+      },
+      "business_metrics": {
+        "revenue_per_customer": 152.49801324503312,
+        "offer_roi": 999.0,
+        "churn_risk_proxy": 0.0
+      },
+      "recommendations": [
+        "Offer exclusive premium rewards to maintain loyalty",
+        "Introduce referral programs leveraging their advocacy",
+        "Test high-value personalized offers (e.g., limited-edition items)",
+        "Minimize discounting; they respond to quality, not price"
+      ]
+    },
+    "cluster_2": {
+      "cluster_id": 2,
+      "segment_name": "Moderate Spenders",
+      "segment_type": "moderate_spender",
+      "size": 4837,
+      "pct_of_total": 0.28452941176470586,
+      "description": "Average customers with moderate spending and engagement. No extreme behaviors; they form your dependable base.",
+      "key_characteristics": {
+        "age": 57.04858383295431,
+        "income": 72368.41017159396,
+        "tenure_months": 19.289216092445525,
+        "avg_spend": 180.8049886293157,
+        "avg_transaction": 21.70220270574361,
+        "view_rate": 0.8242126662531872,
+        "completion_rate": 0.7085521328647233,
+        "bogo_completion_rate": 0.8713906691475433,
+        "discount_completion_rate": 0.725139549307422
+      },
+      "business_metrics": {
+        "revenue_per_customer": 180.8049886293157,
+        "offer_roi": 999.0,
+        "churn_risk_proxy": 0.0
+      },
+      "recommendations": [
+        "Maintain baseline offer cadence to sustain engagement",
+        "Test offer types to identify pathways to higher-value behavior",
+        "Use A/B testing to find optimal offer frequency",
+        "Target upsell opportunities during regular purchasing patterns"
+      ]
+    },
+    "cluster_3": {
+      "cluster_id": 3,
+      "segment_name": "Moderate Spenders",
+      "segment_type": "moderate_spender",
+      "size": 5765,
+      "pct_of_total": 0.3391176470588235,
+      "description": "Average customers with moderate spending and engagement. No extreme behaviors; they form your dependable base.",
+      "key_characteristics": {
+        "age": 51.279271465741544,
+        "income": 57404.85689505637,
+        "tenure_months": 13.02802607150631,
+        "avg_spend": 37.4529540329575,
+        "avg_transaction": 7.433549666526641,
+        "view_rate": 0.673460537727667,
+        "completion_rate": 0.14823070251517778,
+        "bogo_completion_rate": 0.1558167100318011,
+        "discount_completion_rate": 0.1946313963573287
+      },
+      "business_metrics": {
+        "revenue_per_customer": 37.4529540329575,
+        "offer_roi": 999.0,
+        "churn_risk_proxy": 0.0
+      },
+      "recommendations": [
+        "Maintain baseline offer cadence to sustain engagement",
+        "Test offer types to identify pathways to higher-value behavior",
+        "Use A/B testing to find optimal offer frequency",
+        "Target upsell opportunities during regular purchasing patterns"
+      ]
+    }
+  },
+  "segment_assignments": {
+    "0": "Low-Engagement Customers",
+    "1": "High-Value Loyalists",
+    "2": "Moderate Spenders",
+    "3": "Moderate Spenders"
+  }
 }

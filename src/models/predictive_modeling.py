@@ -18,7 +18,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.metrics import (roc_auc_score, precision_score, recall_score, f1_score, 
-                           confusion_matrix, classification_report, roc_curve, auc)
+                           confusion_matrix, classification_report, roc_curve, auc,
+                           brier_score_loss)
 from sklearn.metrics import precision_recall_curve, average_precision_score
 import xgboost as xgb
 import plotly.express as px
@@ -156,6 +157,9 @@ def train_advanced_models(X: np.ndarray, y: np.ndarray) -> Dict[str, Dict[str, A
     """
     Train advanced models: Random Forest, Gradient Boosting, XGBoost.
     
+    Includes StratifiedKFold cross-validation, class weighting for XGBoost,
+    and threshold optimization for F1-score.
+    
     Args:
         X: Feature matrix
         y: Target vector
@@ -167,16 +171,156 @@ def train_advanced_models(X: np.ndarray, y: np.ndarray) -> Dict[str, Dict[str, A
     print("TRAINING ADVANCED MODELS")
     print("="*60)
     
-    # Split data
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
     )
     
+    neg_count = np.bincount(y_train)[0]
+    pos_count = np.bincount(y_train)[1]
+    scale_pos_weight = neg_count / pos_count
+    print(f"Class distribution: neg={neg_count}, pos={pos_count}, scale_pos_weight={scale_pos_weight:.2f}")
+    
     models = {
         'Random Forest': RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1),
         'Gradient Boosting': GradientBoostingClassifier(random_state=42),
-        'XGBoost': xgb.XGBClassifier(random_state=42, eval_metric='logloss', verbosity=0)
+        'XGBoost': xgb.XGBClassifier(
+            random_state=42, eval_metric='logloss', verbosity=0,
+            scale_pos_weight=scale_pos_weight
+        ),
     }
+    
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    
+    results = {}
+    
+    for name, model in models.items():
+        print(f"\nTraining {name}...")
+        
+        model.fit(X_train, y_train)
+        
+        cv_scores = cross_val_score(model, X_train, y_train, cv=cv, scoring='roc_auc', n_jobs=-1)
+        print(f"  CV AUC-ROC: {cv_scores.mean():.4f} +/- {cv_scores.std():.4f}")
+        
+        y_pred = model.predict(X_test)
+        y_pred_proba = model.predict_proba(X_test)[:, 1]
+        
+        results[name] = {
+            'model_name': name,
+            'model': model,
+            'auc_roc': roc_auc_score(y_test, y_pred_proba),
+            'precision': precision_score(y_test, y_pred),
+            'recall': recall_score(y_test, y_pred),
+            'f1': f1_score(y_test, y_pred),
+            'cv_auc_mean': cv_scores.mean(),
+            'cv_auc_std': cv_scores.std(),
+            'X_train': X_train,
+            'X_test': X_test,
+            'y_train': y_train,
+            'y_test': y_test,
+            'y_pred': y_pred,
+            'y_pred_proba': y_pred_proba,
+        }
+        
+        print(f"  AUC-ROC: {results[name]['auc_roc']:.4f}")
+        print(f"  Precision: {results[name]['precision']:.4f}")
+        print(f"  Recall: {results[name]['recall']:.4f}")
+        print(f"  F1-Score: {results[name]['f1']:.4f}")
+    
+    return results
+
+
+def optimize_classification_threshold(y_true: np.ndarray, y_pred_proba: np.ndarray) -> Dict[str, Any]:
+    """
+    Find the optimal classification threshold that maximizes F1-score.
+    
+    Args:
+        y_true: True labels
+        y_pred_proba: Predicted probabilities for the positive class
+        
+    Returns:
+        Dictionary with optimal threshold and metrics at that threshold
+    """
+    print("\n" + "-"*40)
+    print("THRESHOLD OPTIMIZATION (maximize F1)")
+    print("-"*40)
+    
+    thresholds = np.arange(0.1, 0.91, 0.01)
+    best_f1 = 0
+    best_threshold = 0.5
+    best_metrics = {}
+    
+    for thresh in thresholds:
+        y_pred_t = (y_pred_proba >= thresh).astype(int)
+        f1 = f1_score(y_true, y_pred_t, zero_division=0)
+        if f1 > best_f1:
+            best_f1 = f1
+            best_threshold = thresh
+            best_metrics = {
+                'threshold': float(thresh),
+                'f1': float(f1),
+                'precision': float(precision_score(y_true, y_pred_t, zero_division=0)),
+                'recall': float(recall_score(y_true, y_pred_t, zero_division=0)),
+            }
+    
+    print(f"  Optimal threshold: {best_threshold:.2f}")
+    print(f"  F1 at optimal:     {best_metrics['f1']:.4f}")
+    print(f"  Precision at opt:  {best_metrics['precision']:.4f}")
+    print(f"  Recall at opt:     {best_metrics['recall']:.4f}")
+    
+    return best_metrics
+
+
+def compute_brier_score(y_true: np.ndarray, y_pred_proba: np.ndarray) -> float:
+    """
+    Compute Brier score for probability calibration assessment.
+    
+    Args:
+        y_true: True labels (0 or 1)
+        y_pred_proba: Predicted probabilities for the positive class
+        
+    Returns:
+        Brier score (lower is better)
+    """
+    score = brier_score_loss(y_true, y_pred_proba)
+    print(f"  Brier score: {score:.4f} (lower = better calibrated)")
+    return float(score)
+
+
+def analyze_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, Dict[str, float]]:
+    """
+    Calculate and report per-class metrics from the confusion matrix.
+    
+    Args:
+        y_true: True labels
+        y_pred: Predicted labels
+        
+    Returns:
+        Dictionary with per-class precision, recall, F1
+    """
+    print("\n" + "-"*40)
+    print("CONFUSION MATRIX ANALYSIS")
+    print("-"*40)
+    
+    cm = confusion_matrix(y_true, y_pred)
+    print(f"\nConfusion Matrix:")
+    print(cm)
+    
+    report = classification_report(y_true, y_pred, output_dict=True, zero_division=0)
+    
+    per_class = {}
+    for cls in ['0', '1']:
+        label = 'Not Completed' if cls == '0' else 'Completed'
+        per_class[label] = {
+            'precision': report[cls]['precision'],
+            'recall': report[cls]['recall'],
+            'f1': report[cls]['f1-score'],
+            'support': report[cls]['support'],
+        }
+        print(f"  Class {label}: precision={per_class[label]['precision']:.4f}, "
+              f"recall={per_class[label]['recall']:.4f}, f1={per_class[label]['f1']:.4f}, "
+              f"support={per_class[label]['support']}")
+    
+    return per_class
 
 
 def tune_xgboost_hyperparameters(X: np.ndarray, y: np.ndarray, 
@@ -215,7 +359,7 @@ def tune_xgboost_hyperparameters(X: np.ndarray, y: np.ndarray,
         'reg_alpha': [0, 0.1, 1],
     }
         """)
-        print("   Expected outcome: modest AUC-ROC gain (0.909 → ~0.915)")
+        print("   Expected outcome: modest AUC-ROC gain (0.909 to ~0.915)")
         print("   since default params already perform strongly on this dataset.")
         return {"note": "Tuning not executed. Set run=True and re-run."}
     
@@ -259,41 +403,6 @@ def tune_xgboost_hyperparameters(X: np.ndarray, y: np.ndarray,
         "best_cv_score": best_score,
         "test_score": test_score,
     }
-    
-    results = {}
-    
-    for name, model in models.items():
-        print(f"\nTraining {name}...")
-        
-        # Train
-        model.fit(X_train, y_train)
-        
-        # Predictions
-        y_pred = model.predict(X_test)
-        y_pred_proba = model.predict_proba(X_test)[:, 1]
-        
-        # Metrics
-        results[name] = {
-            'model_name': name,
-            'model': model,
-            'auc_roc': roc_auc_score(y_test, y_pred_proba),
-            'precision': precision_score(y_test, y_pred),
-            'recall': recall_score(y_test, y_pred),
-            'f1': f1_score(y_test, y_pred),
-            'X_train': X_train,
-            'X_test': X_test,
-            'y_train': y_train,
-            'y_test': y_test,
-            'y_pred': y_pred,
-            'y_pred_proba': y_pred_proba
-        }
-        
-        print(f"  AUC-ROC: {results[name]['auc_roc']:.4f}")
-        print(f"  Precision: {results[name]['precision']:.4f}")
-        print(f"  Recall: {results[name]['recall']:.4f}")
-        print(f"  F1-Score: {results[name]['f1']:.4f}")
-    
-    return results
 
 
 def evaluate_and_compare_models(baseline_results: Dict, advanced_results: Dict, fig_dir: Path) -> Dict:
@@ -594,39 +703,58 @@ if __name__ == "__main__":
     print("STARBUCKS CUSTOMER SEGMENTATION - PREDICTIVE MODELING")
     print("="*60)
     
-    # Setup
     fig_dir = Path('reports/figures')
     fig_dir.mkdir(parents=True, exist_ok=True)
     
-    # Load interaction features
     print("\nLoading interaction features...")
     interactions = load_interaction_features()
     print(f" Loaded {len(interactions)} customer-offer interactions")
     
-    # Preprocess
     X, y, scaler, feature_names = preprocess_for_modeling(interactions)
     
-    # Train baseline model
     baseline_results = train_baseline_model(X, y)
     
-    # Train advanced models
     advanced_results = train_advanced_models(X, y)
     
-    # Compare models
+    # Threshold optimization for each advanced model
+    print("\n" + "="*60)
+    print("CLASSIFICATION THRESHOLD OPTIMIZATION")
+    print("="*60)
+    for name, res in advanced_results.items():
+        print(f"\n{name}:")
+        threshold_metrics = optimize_classification_threshold(res['y_test'], res['y_pred_proba'])
+        res['threshold_metrics'] = threshold_metrics
+    
+    # Brier score (calibration) for each advanced model
+    print("\n" + "="*60)
+    print("PROBABILITY CALIBRATION (Brier Score)")
+    print("="*60)
+    for name, res in advanced_results.items():
+        print(f"\n{name}:")
+        res['brier_score'] = compute_brier_score(res['y_test'], res['y_pred_proba'])
+    
+    # Confusion matrix analysis for each advanced model
+    for name, res in advanced_results.items():
+        res['per_class_metrics'] = analyze_confusion_matrix(res['y_test'], res['y_pred'])
+    
+    # Also add threshold, brier, per-class to baseline
+    baseline_results['threshold_metrics'] = optimize_classification_threshold(
+        baseline_results['y_test'], baseline_results['y_pred_proba'])
+    baseline_results['brier_score'] = compute_brier_score(
+        baseline_results['y_test'], baseline_results['y_pred_proba'])
+    baseline_results['per_class_metrics'] = analyze_confusion_matrix(
+        baseline_results['y_test'], baseline_results['y_pred'])
+    
     comparison_results = evaluate_and_compare_models(baseline_results, advanced_results, fig_dir)
     best_results = comparison_results['best_results']
     comparison_df = comparison_results['comparison_df']
     
-    # Visualize best model performance
     visualize_best_model_performance(best_results, fig_dir)
     
-    # Analyze feature importance
     feature_importance = analyze_feature_importance(best_results, feature_names, fig_dir)
     
-    # Save results
     save_model_results(best_results, feature_importance, comparison_df)
     
-    # Generate report
     generate_modeling_report(best_results, feature_importance, comparison_df)
     
     print("\n" + "="*60)
@@ -635,6 +763,13 @@ if __name__ == "__main__":
     print(f" Best Model: {best_results['model_name']}")
     print(f" AUC-ROC: {best_results['auc_roc']:.4f} (target: >0.7)")
     print(f" Precision: {best_results['precision']:.4f} (target: >0.6)")
+    if 'cv_auc_mean' in best_results:
+        print(f" CV AUC-ROC: {best_results['cv_auc_mean']:.4f} +/- {best_results['cv_auc_std']:.4f}")
+    if 'threshold_metrics' in best_results:
+        t = best_results['threshold_metrics']
+        print(f" Optimal threshold: {t['threshold']:.2f} (F1={t['f1']:.4f})")
+    if 'brier_score' in best_results:
+        print(f" Brier score: {best_results['brier_score']:.4f}")
     print(f" Visualizations saved to: {fig_dir}")
     print(f" Model saved to: data/processed/best_model.pkl")
     print("="*60)

@@ -6,7 +6,12 @@ This module creates features for customer segmentation and predictive modeling:
 1. Customer demographic features (age, income, gender, tenure)
 2. Behavioral features (transaction frequency, average amount, offer response rates)
 3. Offer features (encoded categorical variables, interaction terms)
-4. Missing data handling with appropriate imputation strategies
+4. RFM features (Recency, Frequency, Monetary with quintile-based scoring)
+5. Time-decay features (recent spend patterns, offer recency)
+6. Channel interaction features (per-channel engagement, total channels used)
+7. Offer completion timing features (avg time to view/complete)
+8. Customer lifetime value proxy
+9. Missing data handling with appropriate imputation strategies
 
 Follows Data Scientist principles: reproducible, documented, validated.
 """
@@ -387,6 +392,280 @@ def create_customer_offer_interaction_features(customer_features: pd.DataFrame,
     return interactions
 
 
+def create_rfm_features(profile: pd.DataFrame, transcript: pd.DataFrame) -> pd.DataFrame:
+    """
+    Create RFM (Recency, Frequency, Monetary) features for each customer.
+    
+    Args:
+        profile: Processed profile DataFrame
+        transcript: Processed transcript DataFrame
+        
+    Returns:
+        DataFrame with RFM features indexed by customer id
+    """
+    print("\n" + "="*60)
+    print("CREATING RFM FEATURES")
+    print("="*60)
+    
+    features = profile[['id']].copy()
+    DATA_END_HOURS = transcript['time'].max()
+    transactions = transcript[transcript['event'] == 'transaction'].copy()
+    
+    # Recency: days since last transaction (relative to data end date)
+    last_tx = transactions.groupby('person')['time'].max().reset_index()
+    last_tx.columns = ['id', 'last_tx_time']
+    features = features.merge(last_tx, on='id', how='left')
+    max_recency = (DATA_END_HOURS - transactions['time'].min()) / 24
+    features['recency_days'] = (DATA_END_HOURS - features['last_tx_time']) / 24
+    features['recency_days'] = features['recency_days'].fillna(max_recency)
+    features.drop('last_tx_time', axis=1, inplace=True)
+    
+    # Frequency: number of transactions
+    freq = transactions.groupby('person').size().reset_index()
+    freq.columns = ['id', 'frequency']
+    features = features.merge(freq, on='id', how='left')
+    features['frequency'] = features['frequency'].fillna(0)
+    
+    # Monetary: total spend
+    monetary = transactions.groupby('person')['transaction_amount'].sum().reset_index()
+    monetary.columns = ['id', 'monetary']
+    features = features.merge(monetary, on='id', how='left')
+    features['monetary'] = features['monetary'].fillna(0)
+    
+    # RFM Score: quintile-based (1-5 scale for each dimension)
+    # Recency: lower recency_days = more recent = higher score
+    features['R_quintile'] = pd.qcut(
+        features['recency_days'].rank(method='first'), q=5, labels=[5, 4, 3, 2, 1]
+    ).astype(int)
+    # Frequency: higher = better
+    features['F_quintile'] = pd.qcut(
+        features['frequency'].rank(method='first'), q=5, labels=[1, 2, 3, 4, 5]
+    ).astype(int)
+    # Monetary: higher = better
+    features['M_quintile'] = pd.qcut(
+        features['monetary'].rank(method='first'), q=5, labels=[1, 2, 3, 4, 5]
+    ).astype(int)
+    
+    features['rfm_score'] = features['R_quintile'] + features['F_quintile'] + features['M_quintile']
+    features.drop(['R_quintile', 'F_quintile', 'M_quintile'], axis=1, inplace=True)
+    
+    print(f" Created {len(features.columns)-1} RFM features for {len(features)} customers")
+    
+    return features
+
+
+def create_time_decay_features(profile: pd.DataFrame, transcript: pd.DataFrame) -> pd.DataFrame:
+    """
+    Create time-decay features measuring recent activity patterns.
+    
+    Args:
+        profile: Processed profile DataFrame
+        transcript: Processed transcript DataFrame
+        
+    Returns:
+        DataFrame with time-decay features indexed by customer id
+    """
+    print("\n" + "="*60)
+    print("CREATING TIME-DECAY FEATURES")
+    print("="*60)
+    
+    features = profile[['id']].copy()
+    DATA_END_HOURS = transcript['time'].max()
+    CUTOFF_7D = DATA_END_HOURS - 7 * 24
+    CUTOFF_14D = DATA_END_HOURS - 14 * 24
+    
+    transactions = transcript[transcript['event'] == 'transaction'].copy()
+    
+    # Spend last 7 days
+    recent_7d = transactions[transactions['time'] >= CUTOFF_7D].groupby('person')['transaction_amount'].sum().reset_index()
+    recent_7d.columns = ['id', 'spend_last_7d']
+    features = features.merge(recent_7d, on='id', how='left')
+    features['spend_last_7d'] = features['spend_last_7d'].fillna(0)
+    
+    # Spend last 14 days
+    recent_14d = transactions[transactions['time'] >= CUTOFF_14D].groupby('person')['transaction_amount'].sum().reset_index()
+    recent_14d.columns = ['id', 'spend_last_14d']
+    features = features.merge(recent_14d, on='id', how='left')
+    features['spend_last_14d'] = features['spend_last_14d'].fillna(0)
+    
+    # Spend trend: ratio of recent average daily spend to overall average transaction
+    avg_trans = transactions.groupby('person')['transaction_amount'].mean().reset_index()
+    avg_trans.columns = ['id', '_avg_trans']
+    features = features.merge(avg_trans, on='id', how='left')
+    features['spend_trend'] = np.where(
+        features['_avg_trans'] > 0,
+        features['spend_last_14d'] / 14 / features['_avg_trans'],
+        0
+    )
+    features.drop('_avg_trans', axis=1, inplace=True)
+    
+    # Offer recency: days since last offer received
+    received = transcript[transcript['event'] == 'offer received'].copy()
+    last_offer = received.groupby('person')['time'].max().reset_index()
+    last_offer.columns = ['id', 'last_offer_time']
+    features = features.merge(last_offer, on='id', how='left')
+    max_offer_recency = (DATA_END_HOURS - received['time'].min()) / 24
+    features['offer_recency_days'] = (DATA_END_HOURS - features['last_offer_time']) / 24
+    features['offer_recency_days'] = features['offer_recency_days'].fillna(max_offer_recency)
+    features.drop('last_offer_time', axis=1, inplace=True)
+    
+    print(f" Created {len(features.columns)-1} time-decay features for {len(features)} customers")
+    
+    return features
+
+
+def create_channel_interaction_features(transcript: pd.DataFrame,
+                                        portfolio: pd.DataFrame) -> pd.DataFrame:
+    """
+    Create channel interaction features for customer-offer pairs.
+    
+    For each customer-offer pair where the offer was viewed, flags which
+    channels the offer was distributed through. Also computes total distinct
+    channels the customer engages with at the customer level.
+    
+    Args:
+        transcript: Processed transcript DataFrame
+        portfolio: Portfolio DataFrame
+        
+    Returns:
+        Tuple of (customer_level_features, interaction_level_features)
+    """
+    print("\n" + "="*60)
+    print("CREATING CHANNEL INTERACTION FEATURES")
+    print("="*60)
+    
+    all_channels = set()
+    for channels in portfolio['channels']:
+        all_channels.update(channels)
+    all_channels = sorted(all_channels)
+    
+    # Build offer-channel mapping
+    offer_channels = portfolio[['id', 'channels']].copy()
+    for channel in all_channels:
+        offer_channels[f'channel_{channel}'] = offer_channels['channels'].apply(
+            lambda x, ch=channel: 1 if ch in x else 0
+        )
+    offer_channels.drop('channels', axis=1, inplace=True)
+    offer_channels.rename(columns={'id': 'offer_id'}, inplace=True)
+    
+    # Customer-level: total_channels_used
+    received = transcript[transcript['event'] == 'offer received'][['person', 'offer_id']].drop_duplicates()
+    received = received.merge(offer_channels, on='offer_id', how='left')
+    channel_cols = [f'channel_{c}' for c in all_channels]
+    customer_channels = received.groupby('person')[channel_cols].max().reset_index()
+    customer_channels['total_channels_used'] = customer_channels[channel_cols].sum(axis=1)
+    customer_channels.rename(columns={'person': 'id'}, inplace=True)
+    customer_level = customer_channels[['id', 'total_channels_used']].copy()
+    
+    # Interaction-level: viewed_via_<channel> flags
+    viewed = transcript[transcript['event'] == 'offer viewed'][['person', 'offer_id']].drop_duplicates()
+    viewed_with_channels = viewed.merge(offer_channels, on='offer_id', how='left')
+    for channel in all_channels:
+        viewed_with_channels.rename(
+            columns={f'channel_{channel}': f'viewed_via_{channel}'},
+            inplace=True
+        )
+    viewed_with_channels.rename(columns={'person': 'customer_id'}, inplace=True)
+    
+    # Add total_channels_used to interaction level
+    viewed_with_channels = viewed_with_channels.merge(
+        customer_level, left_on='customer_id', right_on='id', how='left'
+    )
+    viewed_with_channels.drop('id', axis=1, inplace=True)
+    
+    print(f" Created {len(customer_level.columns)-1} customer-level and "
+          f"{len(viewed_with_channels.columns)-2} interaction-level channel features")
+    
+    return customer_level, viewed_with_channels
+
+
+def create_offer_timing_features(profile: pd.DataFrame, transcript: pd.DataFrame) -> pd.DataFrame:
+    """
+    Create offer completion and viewing timing features per customer.
+    
+    Args:
+        profile: Processed profile DataFrame
+        transcript: Processed transcript DataFrame
+        
+    Returns:
+        DataFrame with timing features indexed by customer id
+    """
+    print("\n" + "="*60)
+    print("CREATING OFFER TIMING FEATURES")
+    print("="*60)
+    
+    features = profile[['id']].copy()
+    offer_events = transcript[transcript['offer_id'].notna()].copy()
+    
+    # Time to view: hours between receiving and viewing
+    received_times = offer_events[offer_events['event'] == 'offer received'][
+        ['person', 'offer_id', 'time']
+    ].copy()
+    received_times.rename(columns={'time': 'received_time'}, inplace=True)
+    viewed_times = offer_events[offer_events['event'] == 'offer viewed'][
+        ['person', 'offer_id', 'time']
+    ].copy()
+    viewed_times.rename(columns={'time': 'viewed_time'}, inplace=True)
+    
+    # Use first received and first viewed per (person, offer_id) for clean pairing
+    received_first = received_times.groupby(['person', 'offer_id'])['received_time'].min().reset_index()
+    viewed_first = viewed_times.groupby(['person', 'offer_id'])['viewed_time'].min().reset_index()
+    view_diff = received_first.merge(viewed_first, on=['person', 'offer_id'], how='inner')
+    view_diff = view_diff[view_diff['viewed_time'] >= view_diff['received_time']]
+    view_diff['hours_to_view'] = view_diff['viewed_time'] - view_diff['received_time']
+    
+    avg_view = view_diff.groupby('person')['hours_to_view'].mean().reset_index()
+    avg_view.columns = ['id', 'avg_time_to_view']
+    features = features.merge(avg_view, on='id', how='left')
+    features['avg_time_to_view'] = features['avg_time_to_view'].fillna(0)
+    
+    # Time to complete: hours between receiving and completing
+    completed_times = offer_events[offer_events['event'] == 'offer completed'][
+        ['person', 'offer_id', 'time']
+    ].copy()
+    completed_times.rename(columns={'time': 'completed_time'}, inplace=True)
+    
+    received_for_complete = received_times.groupby(['person', 'offer_id'])['received_time'].min().reset_index()
+    completed_first = completed_times.groupby(['person', 'offer_id'])['completed_time'].min().reset_index()
+    complete_diff = received_for_complete.merge(completed_first, on=['person', 'offer_id'], how='inner')
+    complete_diff = complete_diff[complete_diff['completed_time'] >= complete_diff['received_time']]
+    complete_diff['hours_to_complete'] = complete_diff['completed_time'] - complete_diff['received_time']
+    
+    avg_complete = complete_diff.groupby('person')['hours_to_complete'].mean().reset_index()
+    avg_complete.columns = ['id', 'avg_time_to_complete']
+    features = features.merge(avg_complete, on='id', how='left')
+    features['avg_time_to_complete'] = features['avg_time_to_complete'].fillna(0)
+    
+    print(f" Created {len(features.columns)-1} offer timing features for {len(features)} customers")
+    
+    return features
+
+
+def create_clv_feature(customer_features: pd.DataFrame) -> pd.DataFrame:
+    """
+    Create customer lifetime value proxy feature.
+    
+    CLV proxy = trans_total * (1 + completion_rate)
+    
+    Args:
+        customer_features: Merged customer features DataFrame (must contain
+            trans_total and completion_rate columns)
+            
+    Returns:
+        DataFrame with clv_proxy feature indexed by customer id
+    """
+    print("\n" + "="*60)
+    print("CREATING CLV PROXY FEATURE")
+    print("="*60)
+    
+    features = customer_features[['id']].copy()
+    features['clv_proxy'] = customer_features['trans_total'] * (1 + customer_features['completion_rate'])
+    
+    print(f" Created 1 CLV proxy feature for {len(features)} customers")
+    
+    return features
+
+
 def normalize_features(features: pd.DataFrame, columns_to_normalize: List[str]) -> Tuple[pd.DataFrame, StandardScaler]:
     """
     Normalize specified features using StandardScaler.
@@ -410,8 +689,14 @@ def normalize_features(features: pd.DataFrame, columns_to_normalize: List[str]) 
     return features_norm, scaler
 
 
-def save_features(customer_features: pd.DataFrame, offer_features: pd.DataFrame, 
-                  interactions: pd.DataFrame, base_path: str = '.') -> None:
+def save_features(customer_features: pd.DataFrame, offer_features: pd.DataFrame,
+                   interactions: pd.DataFrame,
+                   rfm_features: pd.DataFrame = None,
+                   time_decay_features: pd.DataFrame = None,
+                   channel_customer_features: pd.DataFrame = None,
+                   channel_interaction_features: pd.DataFrame = None,
+                   offer_timing_features: pd.DataFrame = None,
+                   base_path: str = '.') -> None:
     """
     Save engineered features to disk.
     
@@ -419,6 +704,11 @@ def save_features(customer_features: pd.DataFrame, offer_features: pd.DataFrame,
         customer_features: Customer features DataFrame
         offer_features: Offer features DataFrame
         interactions: Customer-offer interaction features DataFrame
+        rfm_features: RFM features DataFrame (optional)
+        time_decay_features: Time-decay features DataFrame (optional)
+        channel_customer_features: Customer-level channel features DataFrame (optional)
+        channel_interaction_features: Customer-offer channel features DataFrame (optional)
+        offer_timing_features: Offer timing features DataFrame (optional)
         base_path: Base directory for saving
     """
     output_dir = Path(base_path) / 'data' / 'processed'
@@ -428,11 +718,28 @@ def save_features(customer_features: pd.DataFrame, offer_features: pd.DataFrame,
     offer_features.to_csv(output_dir / 'offer_features.csv', index=False)
     interactions.to_csv(output_dir / 'interaction_features.csv', index=False)
     
+    if rfm_features is not None:
+        rfm_features.to_csv(output_dir / 'rfm_features.csv', index=False)
+    if time_decay_features is not None:
+        time_decay_features.to_csv(output_dir / 'time_decay_features.csv', index=False)
+    if channel_customer_features is not None:
+        channel_customer_features.to_csv(output_dir / 'channel_customer_features.csv', index=False)
+    if channel_interaction_features is not None:
+        channel_interaction_features.to_csv(output_dir / 'channel_interaction_features.csv', index=False)
+    if offer_timing_features is not None:
+        offer_timing_features.to_csv(output_dir / 'offer_timing_features.csv', index=False)
+    
     print(f"\n Features saved to {output_dir}")
 
 
 def generate_feature_summary(customer_features: pd.DataFrame, offer_features: pd.DataFrame,
-                              interactions: pd.DataFrame, output_path: str = 'reports/feature_summary.json') -> Dict:
+                              interactions: pd.DataFrame,
+                              rfm_features: pd.DataFrame = None,
+                              time_decay_features: pd.DataFrame = None,
+                              channel_customer_features: pd.DataFrame = None,
+                              channel_interaction_features: pd.DataFrame = None,
+                              offer_timing_features: pd.DataFrame = None,
+                              output_path: str = 'reports/feature_summary.json') -> Dict:
     """
     Generate a summary report of engineered features.
     
@@ -440,6 +747,11 @@ def generate_feature_summary(customer_features: pd.DataFrame, offer_features: pd
         customer_features: Customer features DataFrame
         offer_features: Offer features DataFrame
         interactions: Interaction features DataFrame
+        rfm_features: RFM features DataFrame (optional)
+        time_decay_features: Time-decay features DataFrame (optional)
+        channel_customer_features: Customer-level channel features DataFrame (optional)
+        channel_interaction_features: Customer-offer channel features DataFrame (optional)
+        offer_timing_features: Offer timing features DataFrame (optional)
         output_path: Path to save the summary report
         
     Returns:
@@ -448,20 +760,52 @@ def generate_feature_summary(customer_features: pd.DataFrame, offer_features: pd
     summary = {
         'customer_features': {
             'count': len(customer_features),
-            'feature_count': len(customer_features.columns) - 1,  # exclude id
+            'feature_count': len(customer_features.columns) - 1,
             'features': [col for col in customer_features.columns if col != 'id']
         },
         'offer_features': {
             'count': len(offer_features),
-            'feature_count': len(offer_features.columns) - 6,  # exclude original columns
+            'feature_count': len(offer_features.columns) - 6,
             'features': [col for col in offer_features.columns if col not in ['id', 'reward', 'channels', 'difficulty', 'duration', 'offer_type']]
         },
         'interaction_features': {
             'count': len(interactions),
-            'feature_count': len(interactions.columns) - 3,  # exclude customer_id, offer_id, completed
+            'feature_count': len(interactions.columns) - 3,
             'target_distribution': interactions['completed'].value_counts().to_dict()
         }
     }
+    
+    if rfm_features is not None:
+        summary['rfm_features'] = {
+            'count': len(rfm_features),
+            'feature_count': len(rfm_features.columns) - 1,
+            'features': [col for col in rfm_features.columns if col != 'id']
+        }
+    if time_decay_features is not None:
+        summary['time_decay_features'] = {
+            'count': len(time_decay_features),
+            'feature_count': len(time_decay_features.columns) - 1,
+            'features': [col for col in time_decay_features.columns if col != 'id']
+        }
+    if channel_customer_features is not None:
+        summary['channel_customer_features'] = {
+            'count': len(channel_customer_features),
+            'feature_count': len(channel_customer_features.columns) - 1,
+            'features': [col for col in channel_customer_features.columns if col != 'id']
+        }
+    if channel_interaction_features is not None:
+        summary['channel_interaction_features'] = {
+            'count': len(channel_interaction_features),
+            'feature_count': len(channel_interaction_features.columns) - 2,
+            'features': [col for col in channel_interaction_features.columns
+                         if col not in ['customer_id', 'offer_id']]
+        }
+    if offer_timing_features is not None:
+        summary['offer_timing_features'] = {
+            'count': len(offer_timing_features),
+            'feature_count': len(offer_timing_features.columns) - 1,
+            'features': [col for col in offer_timing_features.columns if col != 'id']
+        }
     
     with open(output_path, 'w') as f:
         json.dump(summary, f, indent=2, default=str)
@@ -490,6 +834,23 @@ if __name__ == "__main__":
     
     # Merge customer features
     customer_features = customer_demo.merge(customer_behavior, on='id', how='outer')
+    
+    # Create RFM features and merge
+    rfm_features = create_rfm_features(profile, transcript)
+    customer_features = customer_features.merge(rfm_features, on='id', how='left')
+    
+    # Create time-decay features and merge
+    time_decay_features = create_time_decay_features(profile, transcript)
+    customer_features = customer_features.merge(time_decay_features, on='id', how='left')
+    
+    # Create offer timing features and merge
+    offer_timing_features = create_offer_timing_features(profile, transcript)
+    customer_features = customer_features.merge(offer_timing_features, on='id', how='left')
+    
+    # Create CLV proxy (depends on trans_total and completion_rate from behavioral features)
+    clv_features = create_clv_feature(customer_features)
+    customer_features = customer_features.merge(clv_features, on='id', how='left')
+    
     print(f"\n Total customer features: {len(customer_features.columns)-1}")
     
     # Create offer features
@@ -498,11 +859,47 @@ if __name__ == "__main__":
     # Create interaction features for predictive modeling
     interactions = create_customer_offer_interaction_features(customer_features, offer_features, transcript)
     
+    # Create channel interaction features
+    channel_customer, channel_interaction = create_channel_interaction_features(transcript, portfolio)
+    
+    # Merge channel customer-level features into customer features
+    customer_features = customer_features.merge(channel_customer, on='id', how='left')
+    customer_features['total_channels_used'] = customer_features['total_channels_used'].fillna(0)
+    
+    # Merge channel interaction-level features into interactions
+    interactions = interactions.merge(
+        channel_interaction, on=['customer_id', 'offer_id'], how='left'
+    )
+    channel_view_cols = [c for c in channel_interaction.columns if c.startswith('viewed_via_')]
+    for col in channel_view_cols:
+        if col in interactions.columns:
+            interactions[col] = interactions[col].fillna(0)
+    if 'total_channels_used' in interactions.columns:
+        # Already merged via customer_features into interactions, skip duplicate
+        pass
+    
+    print(f"\n Total customer features (with channel): {len(customer_features.columns)-1}")
+    print(f" Total interaction features: {len(interactions.columns)-3}")
+    
     # Save features
-    save_features(customer_features, offer_features, interactions)
+    save_features(
+        customer_features, offer_features, interactions,
+        rfm_features=rfm_features,
+        time_decay_features=time_decay_features,
+        channel_customer_features=channel_customer,
+        channel_interaction_features=channel_interaction,
+        offer_timing_features=offer_timing_features
+    )
     
     # Generate summary
-    summary = generate_feature_summary(customer_features, offer_features, interactions)
+    summary = generate_feature_summary(
+        customer_features, offer_features, interactions,
+        rfm_features=rfm_features,
+        time_decay_features=time_decay_features,
+        channel_customer_features=channel_customer,
+        channel_interaction_features=channel_interaction,
+        offer_timing_features=offer_timing_features
+    )
     
     # Print summary
     print("\n" + "="*60)
@@ -512,4 +909,10 @@ if __name__ == "__main__":
     print(f" Offer features: {summary['offer_features']['count']} offers × {summary['offer_features']['feature_count']} features")
     print(f" Interaction features: {summary['interaction_features']['count']} interactions")
     print(f" Target distribution: {summary['interaction_features']['target_distribution']}")
+    if 'rfm_features' in summary:
+        print(f" RFM features: {summary['rfm_features']['count']} customers × {summary['rfm_features']['feature_count']} features")
+    if 'time_decay_features' in summary:
+        print(f" Time-decay features: {summary['time_decay_features']['count']} customers × {summary['time_decay_features']['feature_count']} features")
+    if 'offer_timing_features' in summary:
+        print(f" Offer timing features: {summary['offer_timing_features']['count']} customers × {summary['offer_timing_features']['feature_count']} features")
     print("="*60)

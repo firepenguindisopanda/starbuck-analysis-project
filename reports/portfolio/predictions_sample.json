@@ -1,0 +1,319 @@
+{
+  "samples": [
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.808,
+      "error": 0
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.21,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.601,
+      "error": 0
+    },
+    {
+      "actual": 0,
+      "predicted": 1,
+      "predicted_probability": 0.835,
+      "error": 1
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.422,
+      "error": 0
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.215,
+      "error": 0
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.473,
+      "error": 0
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.284,
+      "error": 0
+    },
+    {
+      "actual": 0,
+      "predicted": 1,
+      "predicted_probability": 0.973,
+      "error": 1
+    },
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.796,
+      "error": 0
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.197,
+      "error": 0
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.07,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.865,
+      "error": 0
+    },
+    {
+      "actual": 0,
+      "predicted": 1,
+      "predicted_probability": 0.888,
+      "error": 1
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.063,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.671,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.539,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.783,
+      "error": 0
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.04,
+      "error": 0
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.415,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.867,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 0,
+      "predicted_probability": 0.438,
+      "error": 1
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.23,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 0,
+      "predicted_probability": 0.399,
+      "error": 1
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.111,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.923,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.88,
+      "error": 0
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.179,
+      "error": 0
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.172,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.869,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.915,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.747,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.783,
+      "error": 0
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.275,
+      "error": 0
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.437,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.882,
+      "error": 0
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.407,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 0,
+      "predicted_probability": 0.117,
+      "error": 1
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.164,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.675,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.659,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.853,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.902,
+      "error": 0
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.231,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.953,
+      "error": 0
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.294,
+      "error": 0
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.455,
+      "error": 0
+    },
+    {
+      "actual": 0,
+      "predicted": 0,
+      "predicted_probability": 0.22,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.942,
+      "error": 0
+    },
+    {
+      "actual": 1,
+      "predicted": 1,
+      "predicted_probability": 0.898,
+      "error": 0
+    }
+  ],
+  "sample_size": 50,
+  "sampling_method": "stratified",
+  "model": "Histogram gradient boosting",
+  "dataset": "held-out customers",
+  "positive_label": "Completed offers",
+  "negative_label": "not completed",
+  "confusion_matrix": {
+    "tn": 3481,
+    "fp": 1163,
+    "fn": 991,
+    "tp": 4575,
+    "sensitivity": 0.822,
+    "specificity": 0.7496,
+    "precision": 0.7973
+  }
+}

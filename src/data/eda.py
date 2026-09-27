@@ -261,7 +261,7 @@ def create_funnel_visualizations(funnel_results: Dict, fig_dir: Path, portfolio:
     
     # Figure 2: Funnel by offer type (plotly)
     # Merge transcript with portfolio to get offer types
-    transcript_expanded = pd.read_json('transcript.json', lines=True)
+    transcript_expanded = pd.read_json('data/raw/transcript.json', lines=True)
     transcript_expanded['offer_id'] = transcript_expanded['value'].apply(
         lambda x: x.get('offer id') or x.get('offer_id') if isinstance(x, dict) else None
     )

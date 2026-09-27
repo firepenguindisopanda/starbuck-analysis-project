@@ -1,0 +1,223 @@
+{
+  "question": "When a BOGO or discount offer is sent, will this customer complete it within its validity window?",
+  "unit": "one row per offer received (BOGO and discount; informational offers have no completion event)",
+  "features": "offer terms, demographics, and the customer's history strictly before the send",
+  "counts": {
+    "sends_bogo_discount": 61042,
+    "sends_censored_dropped": 10236,
+    "sends_kept": 50806
+  },
+  "completion_rate": 0.5438,
+  "customers": 16804,
+  "original_pipeline_test_auc": 0.9936,
+  "leakage_ladder": [
+    {
+      "step": "Month-long completion counts, viewed flag, random row split",
+      "split": "rows",
+      "n_features": 20,
+      "cv_auc_mean": 0.9341,
+      "cv_auc_std": 0.0022
+    },
+    {
+      "step": "Viewed flag removed",
+      "split": "rows",
+      "n_features": 19,
+      "cv_auc_mean": 0.9315,
+      "cv_auc_std": 0.0022
+    },
+    {
+      "step": "Month-long counts replaced by history before the send",
+      "split": "rows",
+      "n_features": 27,
+      "cv_auc_mean": 0.8655,
+      "cv_auc_std": 0.0044
+    },
+    {
+      "step": "Customers kept apart across folds (the honest setup)",
+      "split": "customers",
+      "n_features": 27,
+      "cv_auc_mean": 0.8647,
+      "cv_auc_std": 0.0034
+    }
+  ],
+  "models": {
+    "Logistic regression": {
+      "cv_auc_mean": 0.8188,
+      "cv_auc_std": 0.0062,
+      "holdout_auc": 0.8223,
+      "holdout_auc_ci95": [
+        0.8131,
+        0.8313
+      ],
+      "holdout_pr_auc": 0.8276,
+      "holdout_brier": 0.1704,
+      "at_threshold_0_5": {
+        "precision": 0.755,
+        "recall": 0.7984,
+        "f1": 0.7761,
+        "confusion_matrix": {
+          "tn": 3202,
+          "fp": 1442,
+          "fn": 1122,
+          "tp": 4444
+        }
+      }
+    },
+    "Histogram gradient boosting": {
+      "cv_auc_mean": 0.8646,
+      "cv_auc_std": 0.0047,
+      "holdout_auc": 0.8651,
+      "holdout_auc_ci95": [
+        0.8573,
+        0.8732
+      ],
+      "holdout_pr_auc": 0.8775,
+      "holdout_brier": 0.1477,
+      "at_threshold_0_5": {
+        "precision": 0.7973,
+        "recall": 0.822,
+        "f1": 0.8094,
+        "confusion_matrix": {
+          "tn": 3481,
+          "fp": 1163,
+          "fn": 991,
+          "tp": 4575
+        }
+      }
+    },
+    "XGBoost": {
+      "cv_auc_mean": 0.8635,
+      "cv_auc_std": 0.0047,
+      "holdout_auc": 0.8648,
+      "holdout_auc_ci95": [
+        0.8571,
+        0.8725
+      ],
+      "holdout_pr_auc": 0.8754,
+      "holdout_brier": 0.1479,
+      "at_threshold_0_5": {
+        "precision": 0.7989,
+        "recall": 0.8214,
+        "f1": 0.81,
+        "confusion_matrix": {
+          "tn": 3493,
+          "fp": 1151,
+          "fn": 994,
+          "tp": 4572
+        }
+      }
+    }
+  },
+  "baselines": {
+    "Base rate (predict the average)": {
+      "holdout_auc": 0.5,
+      "holdout_brier": 0.248
+    },
+    "Offer terms only (logistic regression)": {
+      "holdout_auc": 0.6045,
+      "holdout_brier": 0.2392
+    },
+    "Offer terms and demographics, no history (gradient boosting)": {
+      "holdout_auc": 0.8245,
+      "holdout_brier": 0.1698
+    }
+  },
+  "best_model": "Histogram gradient boosting",
+  "calibration": {
+    "mean_predicted": [
+      0.0473,
+      0.1339,
+      0.2502,
+      0.3835,
+      0.5163,
+      0.6574,
+      0.7696,
+      0.8585,
+      0.8991,
+      0.9456
+    ],
+    "fraction_completed": [
+      0.047,
+      0.1381,
+      0.2351,
+      0.3643,
+      0.5201,
+      0.6738,
+      0.7786,
+      0.8345,
+      0.8981,
+      0.9618
+    ]
+  },
+  "permutation_importance": [
+    {
+      "feature": "prior_avg_spend",
+      "auc_drop": 0.0893
+    },
+    {
+      "feature": "tenure_days",
+      "auc_drop": 0.0691
+    },
+    {
+      "feature": "income",
+      "auc_drop": 0.0281
+    },
+    {
+      "feature": "reward",
+      "auc_drop": 0.0256
+    },
+    {
+      "feature": "age",
+      "auc_drop": 0.0183
+    },
+    {
+      "feature": "n_channels",
+      "auc_drop": 0.0144
+    },
+    {
+      "feature": "prior_spend",
+      "auc_drop": 0.005
+    },
+    {
+      "feature": "prior_transactions",
+      "auc_drop": 0.0041
+    },
+    {
+      "feature": "duration",
+      "auc_drop": 0.004
+    },
+    {
+      "feature": "difficulty",
+      "auc_drop": 0.003
+    },
+    {
+      "feature": "hours_since_last_transaction",
+      "auc_drop": 0.0014
+    },
+    {
+      "feature": "gender_M",
+      "auc_drop": 0.0011
+    }
+  ],
+  "time_check": {
+    "train_sends": 30420,
+    "test_sends": 20386,
+    "train_waves_hours": [
+      0,
+      168,
+      336
+    ],
+    "test_waves_hours": [
+      408,
+      504,
+      576
+    ],
+    "test_auc": 0.878
+  },
+  "holdout": {
+    "customers": 3361,
+    "sends": 10210,
+    "train_sends": 40596,
+    "completion_rate": 0.5452
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "best": {
+    "auc_roc": 0.8651,
+    "precision": 0.7973,
+    "recall": 0.822,
+    "f1": 0.8094
+  },
+  "baseline": {
+    "auc_roc": 0.8223,
+    "precision": 0.755,
+    "recall": 0.7984,
+    "f1": 0.7761
+  },
+  "improvement": {
+    "auc_roc_over_baseline_pct": 5.2,
+    "recall_gain_pct": 2.4
+  },
+  "training_samples": 40596,
+  "test_samples": 10210,
+  "best_model": "Histogram gradient boosting",
+  "baseline_model": "Logistic regression",
+  "imbalance_ratio": "1.2:1",
+  "positive_pct": 54.5,
+  "models_trained": 3,
+  "cross_validation": {
+    "cv_folds": 5,
+    "cv_auc_mean": 0.8646,
+    "cv_auc_std": 0.0047,
+    "interpretation": "Customers kept apart across folds"
+  },
+  "brier_score": 0.1477
+}

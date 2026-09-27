@@ -265,9 +265,9 @@ def load_all_datasets(base_path: str = '.') -> Tuple[pd.DataFrame, pd.DataFrame,
     Returns:
         Tuple of (portfolio_df, profile_df, transcript_df)
     """
-    portfolio = load_json_to_dataframe(f"{base_path}/portfolio.json")
-    profile = load_json_to_dataframe(f"{base_path}/profile.json")
-    transcript = load_json_to_dataframe(f"{base_path}/transcript.json")
+    portfolio = load_json_to_dataframe(f"{base_path}/data/raw/portfolio.json")
+    profile = load_json_to_dataframe(f"{base_path}/data/raw/profile.json")
+    transcript = load_json_to_dataframe(f"{base_path}/data/raw/transcript.json")
     
     return portfolio, profile, transcript
 

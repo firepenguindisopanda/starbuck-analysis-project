@@ -1,0 +1,47 @@
+{
+  "features": [
+    {
+      "name": "prior_avg_spend",
+      "importance": 0.0893
+    },
+    {
+      "name": "tenure_days",
+      "importance": 0.0691
+    },
+    {
+      "name": "income",
+      "importance": 0.0281
+    },
+    {
+      "name": "reward",
+      "importance": 0.0256
+    },
+    {
+      "name": "age",
+      "importance": 0.0183
+    },
+    {
+      "name": "n_channels",
+      "importance": 0.0144
+    },
+    {
+      "name": "prior_spend",
+      "importance": 0.005
+    },
+    {
+      "name": "prior_transactions",
+      "importance": 0.0041
+    },
+    {
+      "name": "duration",
+      "importance": 0.004
+    },
+    {
+      "name": "difficulty",
+      "importance": 0.003
+    }
+  ],
+  "total_features": 27,
+  "model_type": "Histogram gradient boosting (permutation, AUC lost when shuffled)",
+  "dataset": "Starbucks offer completion at send time"
+}

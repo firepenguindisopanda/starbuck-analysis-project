@@ -38,9 +38,9 @@ def load_processed_data(base_path: str = '.') -> Tuple[pd.DataFrame, pd.DataFram
         Tuple of processed (portfolio_df, profile_df, transcript_df)
     """
     # Load data
-    portfolio = pd.read_json(f"{base_path}/portfolio.json", lines=True)
-    profile = pd.read_json(f"{base_path}/profile.json", lines=True)
-    transcript = pd.read_json(f"{base_path}/transcript.json", lines=True)
+    portfolio = pd.read_json(f"{base_path}/data/raw/portfolio.json", lines=True)
+    profile = pd.read_json(f"{base_path}/data/raw/profile.json", lines=True)
+    transcript = pd.read_json(f"{base_path}/data/raw/transcript.json", lines=True)
     
     # Add normalized offer_type (uppercase for consistency)
     portfolio['offer_type_normalized'] = portfolio['offer_type'].str.upper()
@@ -213,7 +213,7 @@ def create_customer_behavioral_features(profile: pd.DataFrame, transcript: pd.Da
     # ---- Offer Type Preferences ----
     # Merge offer type information
     offer_events_merged = offer_events.merge(
-        pd.read_json('portfolio.json', lines=True)[['id', 'offer_type']], 
+        pd.read_json('data/raw/portfolio.json', lines=True)[['id', 'offer_type']], 
         left_on='offer_id', right_on='id', how='left'
     )
     

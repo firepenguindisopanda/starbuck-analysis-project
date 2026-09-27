@@ -16,27 +16,27 @@ from src.data.load_data import (
 
 
 class TestLoadJsonToDataFrame:
-    def test_load_portfolio_returns_dataframe(self, portfolio_json):
+    def test_load_portfolio_returns_dataframe(self, data_dir):
         """Verify JSONL portfolio is loaded as a DataFrame."""
-        path = Path(__file__).resolve().parent.parent / "portfolio.json"
+        path = data_dir / "portfolio.json"
         df = load_json_to_dataframe(str(path))
         assert isinstance(df, pd.DataFrame)
 
-    def test_load_portfolio_has_correct_shape(self, portfolio_json):
-        path = Path(__file__).resolve().parent.parent / "portfolio.json"
+    def test_load_portfolio_has_correct_shape(self, data_dir, portfolio_json):
+        path = data_dir / "portfolio.json"
         df = load_json_to_dataframe(str(path))
         assert len(df) == len(portfolio_json), f"Expected {len(portfolio_json)} rows"
         # At minimum: id, offer_type, difficulty, reward, duration, channels
         assert df.shape[1] >= 6
 
-    def test_load_profile_returns_dataframe(self):
-        path = Path(__file__).resolve().parent.parent / "profile.json"
+    def test_load_profile_returns_dataframe(self, data_dir):
+        path = data_dir / "profile.json"
         df = load_json_to_dataframe(str(path))
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 17000
 
-    def test_load_transcript_returns_dataframe(self):
-        path = Path(__file__).resolve().parent.parent / "transcript.json"
+    def test_load_transcript_returns_dataframe(self, data_dir):
+        path = data_dir / "transcript.json"
         df = load_json_to_dataframe(str(path))
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 306534
@@ -140,13 +140,13 @@ class TestValidateTranscriptSchema:
 
 class TestLoadAllDatasets:
     def test_returns_tuple_of_three(self, data_dir):
-        p, pr, t = load_all_datasets(str(data_dir))
+        p, pr, t = load_all_datasets(str(data_dir.parent.parent))
         assert isinstance(p, pd.DataFrame)
         assert isinstance(pr, pd.DataFrame)
         assert isinstance(t, pd.DataFrame)
 
     def test_correct_row_counts(self, data_dir):
-        p, pr, t = load_all_datasets(str(data_dir))
+        p, pr, t = load_all_datasets(str(data_dir.parent.parent))
         assert len(p) == 10
         assert len(pr) == 17000
         assert len(t) == 306534

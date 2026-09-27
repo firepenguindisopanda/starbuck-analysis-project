@@ -50,9 +50,9 @@ def load_data_for_causal_analysis(base_path: str = '.') -> Tuple[pd.DataFrame, p
     Returns:
         Tuple of (portfolio, profile, transcript)
     """
-    portfolio = pd.read_json(f"{base_path}/portfolio.json", lines=True)
-    profile = pd.read_json(f"{base_path}/profile.json", lines=True)
-    transcript = pd.read_json(f"{base_path}/transcript.json", lines=True)
+    portfolio = pd.read_json(f"{base_path}/data/raw/portfolio.json", lines=True)
+    profile = pd.read_json(f"{base_path}/data/raw/profile.json", lines=True)
+    transcript = pd.read_json(f"{base_path}/data/raw/transcript.json", lines=True)
     
     transcript['offer_id'] = transcript['value'].apply(
         lambda x: x.get('offer id') or x.get('offer_id') if isinstance(x, dict) else None
@@ -814,7 +814,7 @@ def simulate_ab_test(recommendation_results: Dict[str, Any],
 
 def build_recommendation_rules(customer_clusters_path: str = 'data/processed/customer_clusters.csv',
                                 cluster_profiles_path: str = 'data/processed/cluster_profiles.csv',
-                                portfolio_path: str = 'portfolio.json') -> Dict[str, Any]:
+                                portfolio_path: str = 'data/raw/portfolio.json') -> Dict[str, Any]:
     """
     Build rule-based offer recommendation system based on cluster analysis.
     
@@ -853,7 +853,7 @@ def build_recommendation_rules(customer_clusters_path: str = 'data/processed/cus
         print(f"    Secondary offer: {rule['secondary']}")
         print(f"    Rationale: {rule['rationale']}")
     
-    transcript = pd.read_json('transcript.json', lines=True)
+    transcript = pd.read_json('data/raw/transcript.json', lines=True)
     transcript['offer_id'] = transcript['value'].apply(
         lambda x: x.get('offer id') or x.get('offer_id') if isinstance(x, dict) else None
     )

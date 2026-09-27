@@ -8,7 +8,11 @@ from pathlib import Path
 
 @pytest.fixture(scope="session")
 def data_dir() -> Path:
-    return Path(__file__).resolve().parent.parent
+    """The raw Udacity files, which are not in the repository (see README, Data)."""
+    raw = Path(__file__).resolve().parent.parent / "data" / "raw"
+    if not (raw / "transcript.json").exists():
+        pytest.skip("raw data not downloaded: see README, Data")
+    return raw
 
 
 @pytest.fixture(scope="session")
